@@ -1,0 +1,95 @@
+name: M0 foundation
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/server
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: "0.12.17"
+          python-version: "3.12.14"
+          working-directory: apps/server
+          enable-cache: true
+      - run: uv sync --locked --dev
+      - run: uv run --locked ruff check .
+      - run: uv run --locked ruff format --check .
+      - run: uv run --locked ruff check ../../scripts/init-env.py ../../tests
+      - run: uv run --locked ruff format --check ../../scripts/init-env.py ../../tests
+      - run: uv run --locked pytest
+      - name: Check environment initializer
+        working-directory: .
+        run: python3 -m unittest discover -s tests -v
+
+  frontend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.19.0"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm install --global npm@11.17.0 --registry=https://registry.npmmirror.com
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build
+
+  compose:
+    needs: [backend, frontend]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      COMPOSE_PROJECT_NAME: life-archive-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      POSTGRES_USER: life_archive
+      POSTGRES_DB: life_archive
+      WEB_PORT: "18080"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Generate an ephemeral database password
+        run: |
+          life_archive_ci_password="$(openssl rand -hex 32)"
+          echo "::add-mask::$life_archive_ci_password"
+          printf 'POSTGRES_PASSWORD=%s\n' "$life_archive_ci_password" >> "$GITHUB_ENV"
+      - name: Validate Compose and smoke script
+        run: |
+          docker compose --profile worker config --quiet
+          bash -n scripts/smoke-compose.sh
+      - name: Build and start the isolated stack
+        run: docker compose up --wait --wait-timeout 180 --build
+      - name: Check routing, migration, persistence and worker
+        run: bash scripts/smoke-compose.sh
+      - name: Show service logs on failure
+        if: failure()
+        run: docker compose logs --no-color --tail 150 web api postgres
+      - name: Stop the isolated stack (preserve volumes)
+        if: always()
+        run: docker compose --profile worker down --remove-orphans

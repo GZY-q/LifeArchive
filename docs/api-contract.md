@@ -1,5 +1,7 @@
 # API contract draft — /api/v1
 
+M0 唯一已实现的接口为 `GET /api/v1/health`，HTTP 200 / `{"status":"ok"}`，无鉴权、无敏感信息，只报告 API 存活，不检查数据库。下表仍是未来接口草案。
+
 This is the intended resource boundary, **not implemented endpoints**. Responses must be Pydantic typed, errors consistent, pagination stable, and permission checks applied at every record read and mutation.
 
 | Method | Resource | Purpose |

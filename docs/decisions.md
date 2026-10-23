@@ -17,3 +17,8 @@ Status: accepted. Keep `entry_date`, real timestamps, source publication time, e
 
 ## ADR-006 — Search incrementally
 Status: accepted. Start with keyword/date/tag query; validate Chinese search. Add hybrid semantic search only when essential.
+
+## ADR-007 — M0 development baseline
+Status: accepted for M0. npm + package-lock and uv + uv.lock lock the two dependency graphs. Keep the frontend as a small React page with plain CSS; editor, UI library and authentication decisions remain for their assigned milestones. Use synchronous SQLAlchemy 2 + psycopg 3 sessions, with transaction ownership explicit in future services. The health endpoint is liveness only and initializes neither database connections nor scheduling.
+
+Compose exposes only a loopback HTTP Web port. PostgreSQL 17 is on an internal network with a named volume. Alembic migrations are explicit commands; the initial revision has no business tables. The worker shares the API image but is behind a profile and exits immediately in M0. This development baseline does not satisfy the later production authentication, HTTPS, export or backup gates.
