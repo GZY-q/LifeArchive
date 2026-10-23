@@ -49,7 +49,11 @@ Compose/Caddy 使用官方 release 二进制并核对 GitHub asset SHA-256；只
 3. PostgreSQL `pgdata` 命名卷的重启持久化验收。
 4. 同一后端镜像启动 worker 并正常退出。
 
-这些步骤已接入 `.github/workflows/ci.yml`；结果以 PR 的实际 Actions 运行记录为准。完成前不要把 M0 标为全部验收通过，也不要直接启动 M1。
+上述本机缺失的步骤已由真实 GitHub Actions 补齐：[M0 foundation / run 39995118438](https://github.com/GZY-q/LifeArchive/actions/runs/39995118438)，对应实现提交 `ad242cc1030ee42fcb7cdc1dc022255a77d4bead`。`backend`、`frontend`、`compose` 三个 job 均成功。
+
+[Compose job 日志](https://github.com/GZY-q/LifeArchive/actions/runs/39995118438/job/120556768412) 确认：配置有效、镜像构建与服务健康启动成功，首页/API/SPA 路由成功，在线迁移重复执行成功，PostgreSQL 重启后 `0001_foundation` 仍保留，worker 正常退出，最终 Web 检查再次成功。停止测试栈时保留数据卷，没有执行 `down --volumes`。
+
+至此，M0 工单的六项验收均有对应实现、文档及本机或 CI 验证证据。可以审查 M0 PR；下一阶段仍需由用户分配，不在本次提前实现。
 
 本机或 CI 的精确复核命令见 README 的“隔离的完整验收”。持久化脚本会：确认 PostgreSQL 挂载本项目 `pgdata` 命名卷 → 执行两次迁移 → 读取 `alembic_version` → 重启 PostgreSQL → 等待就绪 → 确认版本行不变并由 API 再次读取迁移状态。基线版本记录是测试数据，不创建额外业务表；此方法覆盖任务要求的重启保存，不声称完成备份恢复验证。
 
@@ -58,4 +62,4 @@ Compose/Caddy 使用官方 release 二进制并核对 GitHub asset SHA-256；只
 - 迁移影响：仅 Alembic 版本基线；无用户/日记/任务业务表。API 启动不自动迁移。
 - M0 为 loopback HTTP 开发栈，无 owner 认证、生产 HTTPS、媒体、备份或导出功能。
 - `.env`、依赖目录、二进制与构建产物均忽略；原有已跟踪 `.DS_Store` 的用户改动保持不动、不纳入本次提交。
-- 下一步严格为 `tasks/01-journal.md`，按 [开发交接](m0-handoff.md) 的切片推进，先补齐/确认 M0 容器验收。
+- 下一步严格为 `tasks/01-journal.md`，审查 M0 PR 后按 [开发交接](m0-handoff.md) 的切片推进。

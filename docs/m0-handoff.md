@@ -12,7 +12,7 @@
 | `apps/server/src/life_archive/main.py` | 应用工厂和类型化 health；不启动数据库迁移、调度器或 worker。 |
 | `apps/server/src/life_archive/settings.py` | 运行设置和单独的数据库设置；懒加载密码，SecretStr，SQLAlchemy URL.create 处理特殊字符。 |
 | `apps/server/src/life_archive/db.py` | 懒加载同步 engine/sessionmaker、Base 命名约定、请求作用域会话；PostgreSQL 会话时区 UTC。 |
-| `apps/server/alembic/` | `0001_foundation` 无业务表基线，仅产生 Alembic 版本记录。后续模型必须先导入 `env.py` 才能自动生成迁移。 |
+| `apps/server/alembic/` | `0001_foundation` 无业务表基线，仅产生 Alembic 版本记录。新增 ORM 模型后，须在 `env.py` 中导入模型模块，使其注册到 `Base.metadata`，再自动生成迁移。 |
 | `apps/server/src/life_archive/worker.py` | 独立入口，说明无任务后退出；只有未来对应任务才引入调度/持久任务表。 |
 | `compose.yaml`、`infra/Caddyfile` | 同源 SPA/API；DB 内部网络和命名卷；API/worker 同镜像；worker profile 默认关闭。 |
 | `scripts/init-env.py` | 独占新建 `.env`，生成随机密码、权限 `0600`；已有配置绝不覆盖。 |
