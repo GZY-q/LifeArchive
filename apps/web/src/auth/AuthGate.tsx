@@ -3,9 +3,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { getSession, logout } from '../api/auth';
 import type { Session } from '../api/auth';
 import { errorMessage, isUnauthorized } from '../api/client';
-import { emptyDraft, hasUnsavedDraft } from '../journal/draft';
+import { emptyDraft, hasUnsavedDraft, todayIn } from '../journal/draft';
 import type { Draft } from '../journal/draft';
 import { JournalWorkspace } from '../journal/JournalWorkspace';
+import { CalendarWorkspace } from '../calendar/CalendarWorkspace';
 import { LoginForm } from './LoginForm';
 
 export function AuthGate() {
@@ -18,6 +19,8 @@ export function AuthGate() {
   const [signingOut, setSigningOut] = useState(false);
   const [writeBusy, setWriteBusy] = useState(false);
   const [revalidating, setRevalidating] = useState(false);
+  const [view, setView] = useState<'journal' | 'calendar'>('journal');
+  const [calendarDate, setCalendarDate] = useState<string | null>(null);
   const ownerId = useRef<string | null>(null);
 
   useEffect(() => {
@@ -50,8 +53,11 @@ export function AuthGate() {
   }, [draft]);
 
   function acceptLogin(current: Session) {
-    if (ownerId.current !== current.user.id || !draft)
+    if (ownerId.current !== current.user.id || !draft) {
       setDraft(emptyDraft(current.user.timezone));
+      setCalendarDate(null);
+      setView('journal');
+    }
     ownerId.current = current.user.id;
     setSession(current);
     setExpired(false);
@@ -103,6 +109,8 @@ export function AuthGate() {
     setDraft(null);
     ownerId.current = null;
     setExpired(false);
+    setCalendarDate(null);
+    setView('journal');
   }
 
   if (loading)
@@ -175,13 +183,47 @@ export function AuthGate() {
           {error}
         </p>
       )}
+      <nav className="workspace-navigation" aria-label="主导航">
+        <button
+          type="button"
+          className={`nav-item ${view === 'journal' ? 'selected' : ''}`}
+          aria-current={view === 'journal' ? 'page' : undefined}
+          disabled={signingOut || revalidating || writeBusy}
+          onClick={() => setView('journal')}
+        >
+          日记
+        </button>
+        <button
+          type="button"
+          className={`nav-item ${view === 'calendar' ? 'selected' : ''}`}
+          aria-current={view === 'calendar' ? 'page' : undefined}
+          disabled={signingOut || revalidating || writeBusy}
+          onClick={() => setView('calendar')}
+        >
+          日历
+        </button>
+        <button type="button" className="nav-item" disabled>
+          归档 <span className="nav-soon">待开放</span>
+        </button>
+      </nav>
       {draft && (
-        <JournalWorkspace
-          session={session}
-          draft={draft}
-          onDraft={setDraft}
+        <div hidden={view !== 'journal'}>
+          <JournalWorkspace
+            session={session}
+            draft={draft}
+            onDraft={setDraft}
+            onExpired={expire}
+            onBusy={setWriteBusy}
+            disabled={signingOut || revalidating || view !== 'journal'}
+          />
+        </div>
+      )}
+      {view === 'calendar' && (
+        <CalendarWorkspace
+          date={calendarDate ?? todayIn(session.user.timezone)}
+          timezone={session.user.timezone}
+          onDate={setCalendarDate}
           onExpired={expire}
-          onBusy={setWriteBusy}
           disabled={signingOut || revalidating}
         />
       )}

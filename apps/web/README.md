@@ -1,6 +1,6 @@
-# LifeArchive Web · M1
+# LifeArchive Web · M2 第一片
 
-实现 owner 登录、日记录入/列表/编辑/删除确认、版本比对和修订历史，以及健康指示。草稿仅在页面内存；会话失效时隐藏私密 DOM，重新登录可继续同页草稿。完整部署和边界见根 README 与 `docs/m1-handoff.md`。
+实现 owner 登录、日记录入/列表/编辑/删除确认、版本比对和修订历史，以及月历计数和日期详情。切换日历时保留日记组件与内存草稿；会话失效时移除两个视图的私密 DOM，重新登录可继续同页草稿。完整部署和边界见根 README 与 `docs/m2-handoff.md`。
 
 ## 本地开发
 
@@ -39,10 +39,11 @@ npm run build
 
 | 文件                                 | 职责                                              |
 | ------------------------------------ | ------------------------------------------------- |
-| `src/App.tsx`                        | 当前首页与导航占位，后续页面从这里接入            |
-| `src/auth/`                          | 登录边界、重新验证和显式退出                      |
+| `src/App.tsx`                        | 应用外壳与健康指示                                |
+| `src/auth/`                          | 登录边界、认证内导航、重新验证和显式退出          |
 | `src/api/`                           | typed 同源客户端、响应校验、15 秒超时、CSRF       |
 | `src/journal/`                       | 日期、创建重试 UUID、列表、409 草稿比对与修订历史 |
+| `src/calendar/`                      | 公历日期运算、月历和分页日期详情                  |
 | `src/components/MarkdownEditor.tsx`  | 受控原文适配、IME composition 状态                |
 | `src/api/health.ts`                  | 同源健康请求及响应校验                            |
 | `src/components/HealthIndicator.tsx` | 请求状态、8 秒超时、取消与手动重试                |
@@ -52,13 +53,13 @@ npm run build
 
 健康响应约定为 HTTP 2xx 且 JSON `{ "status": "ok" }`；它只说明 API 可响应，不代表数据库、鉴权或全部功能可用。前端不展示服务内部错误信息。请求仅在挂载或用户手动检查时触发，没有后台轮询。
 
-测试覆盖健康状态、登录与 401、CSRF、会话重新验证、创建结果不确定时的 UUID 重试、中文组合输入、补记、409 草稿保护、删除确认、分页和修订安全显示。真实 Chrome 还会运行 `scripts/smoke-browser.mjs`，验证真实 API 与布局。
+测试覆盖健康状态、登录与 401、CSRF、会话重新验证、创建结果不确定时的 UUID 重试、中文组合输入、补记、409 草稿保护、删除确认、分页和修订安全显示。M2 第一片还覆盖月历/单日请求竞态与重试、跨视图保留草稿/UUID/冲突状态、时区默认值及 1–9999 年公历边界。真实 Chrome 运行 `scripts/smoke-browser.mjs`，验证真实 API、日期计数、原文、草稿和桌面/手机尺寸布局。
 
 M1 未引入 `@usememos/editor`。已核验其正式 `26.10.25` 包存在、MIT、React peer >=18；上游仍要求真实系统 IME / 移动软键盘矩阵，因此本轮使用独立 textarea 适配层。详见 [编辑器选择记录](../../docs/m1-handoff.md)。不要将 Chrome 模拟的 composition 事件声称为全部真实键盘通过。
 
 ## 依赖依据
 
-沿用 M0 已锁定的 React/Vite 依赖，M1 不额外升级前端依赖。TypeScript 固定 6.0.3，满足 `typescript-eslint` 的 `<6.1` peer 约束；布局使用普通 CSS。依赖与设计参考：
+沿用 M0 已锁定的 React/Vite 依赖，M1 和 M2 第一片均不额外升级前端依赖。TypeScript 固定 6.0.3，满足 `typescript-eslint` 的 `<6.1` peer 约束；布局使用普通 CSS。依赖与设计参考：
 
 - [Vite 环境要求](https://vite.dev/guide/)
 - [Vite 开发代理](https://vite.dev/config/server-options#server-proxy)

@@ -18,31 +18,16 @@ export function App() {
           </span>
         </a>
 
-        <nav className="navigation" aria-label="主导航">
-          <a className="nav-item selected" href="#main" aria-current="page">
-            <span>日记</span>
-            <span className="nav-number" aria-hidden="true">
-              01
-            </span>
-          </a>
-          {['日历', '归档'].map((label) => (
-            <button className="nav-item" type="button" disabled key={label}>
-              <span>{label}</span>
-              <span className="nav-soon">待开放</span>
-            </button>
-          ))}
-        </nav>
-
         <div className="sidebar-footer">
           <HealthIndicator />
-          <p className="edition">LIFEARCHIVE / M1</p>
+          <p className="edition">LIFEARCHIVE</p>
         </div>
       </aside>
 
       <main id="main" className="main-content" tabIndex={-1}>
         <header className="page-header">
           <span>你的私人生活档案</span>
-          <span className="version-label">日记 · M1</span>
+          <span className="version-label">记录与回望</span>
         </header>
 
         <AuthGate />

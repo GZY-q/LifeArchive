@@ -14,7 +14,7 @@ export function todayIn(timezone: string): string {
   }).formatToParts(new Date());
   const part = (name: string) =>
     parts.find((item) => item.type === name)!.value;
-  return `${part('year')}-${part('month')}-${part('day')}`;
+  return `${part('year').padStart(4, '0')}-${part('month')}-${part('day')}`;
 }
 
 export function emptyDraft(timezone: string): Draft {

@@ -1,6 +1,6 @@
-# LifeArchive API（M1）
+# LifeArchive API（M2 第一片）
 
-当前实现 health、单一 owner CLI、Argon2id 登录、可撤销会话/CSRF/限流，以及有版本和创建幂等保护的日记 CRUD。没有新闻、AI、媒体或任务调度器。完整运行和验证见根 README、`docs/m1-handoff.md`、`docs/m1-acceptance.md`。
+当前实现 health、单一 owner CLI、Argon2id 登录、可撤销会话/CSRF/限流，以及有版本和创建幂等保护的日记 CRUD。M2 第一片新增按日记日期统计的月历和日期详情，复用现有表、索引与分页。没有新闻、AI、媒体或任务调度器。完整运行和验证见根 README、`docs/m2-handoff.md`、`docs/m2-acceptance.md`。
 
 ## 开发与检查
 
@@ -28,6 +28,7 @@ Python 固定为 `.python-version` 的 3.12.14，uv 固定为 `pyproject.toml` �
 | `src/life_archive/main.py` | 组装 health/auth/journal、验证错误脱敏和私密响应 no-store |
 | `src/life_archive/auth/` | owner、Argon2id、会话摘要、CSRF、共享限流、认证依赖 |
 | `src/life_archive/journal/` | owner 范围读写、原子修订、快照、分页与创建请求去重 |
+| `src/life_archive/timeline/` | owner 范围月历计数和日期详情，只读现有日记 |
 | `src/life_archive/cli.py` | 唯一 owner 初始化（密码 getpass / 显式 stdin） |
 | `src/life_archive/settings.py` | Pydantic 配置；普通应用配置和 DB 密钥分别延迟读取 |
 | `src/life_archive/db.py` | DeclarativeBase、延迟创建的 engine、每次请求独立的同步 Session |
@@ -60,6 +61,6 @@ docker compose exec -T api alembic current
 
 新增 ORM 模型时继承 `Base`，在 `alembic/env.py` 中导入模型，再生成并审查新迁移。M1 的 head 为 `0003_journal`，迁移也创建认证表。不要修改已应用的迁移；不要一次创建设计文档中的全部未来表。单元测试中的 SQLite 仅验证基础 Session 行为，业务、并发和迁移用真实 PostgreSQL。
 
-当前实现范围以 `tasks/01-journal.md` 为准；后续仅执行明确分配的工单。继续保持 API 与 worker 入口独立；worker 使用 `python -m life_archive.worker`，没有调度器、业务任务或常驻循环。
+当前实现范围以 `tasks/01-journal.md` 和 `tasks/02-calendar-days.md` 为准；后续仅执行明确分配的工单。M2 第一片没有迁移，head 仍为 `0003_journal`。继续保持 API 与 worker 入口独立；worker 使用 `python -m life_archive.worker`，没有调度器、业务任务或常驻循环。
 
 实现依据：[SQLAlchemy URL](https://docs.sqlalchemy.org/en/20/core/engines.html#creating-urls-programmatically)、[Session 生命周期](https://docs.sqlalchemy.org/en/20/orm/session_basics.html)、[Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)、[Alembic 教程](https://alembic.sqlalchemy.org/en/latest/tutorial.html)、[uv 容器部署](https://docs.astral.sh/uv/guides/integration/docker/)。

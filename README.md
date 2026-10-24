@@ -7,8 +7,9 @@ LifeArchive 是一个独立实现、单用户优先、自托管、面向几十�
 ## 当前状态
 
 - 已完成 M0 基础设施；M1 提供单一 owner 登录、私密会话、日记 CRUD、原文修订历史、补记日期、分页与并发冲突保护。
-- 编辑器通过独立适配层使用原生 Markdown 文本域；第三方编辑器的中文 IME / 移动端兼容验证仍需补齐。媒体、标签、日历、新闻、AI 与备份尚未实现。
-- 运行与限制见 [M1 交接](docs/m1-handoff.md)，实际检查见 [M1 验收记录](docs/m1-acceptance.md)。历史基础设施证据保留在 [M0 验收记录](docs/m0-acceptance.md)。
+- M2 第一片提供月历计数和日期详情，按日记日期查看补记和同日多条记录；原文分页读取，切换视图保留当前草稿。
+- 编辑器通过独立适配层使用原生 Markdown 文本域；第三方编辑器的中文 IME / 移动端兼容验证仍需补齐。媒体、标签、搜索、往年今日、新闻、AI 与备份尚未实现。
+- 最新运行与限制见 [M2 第一片交接](docs/m2-handoff.md) 和 [验收记录](docs/m2-acceptance.md)；认证和日记约定见 [M1 交接](docs/m1-handoff.md)。历史检查保留在 [M1](docs/m1-acceptance.md) / [M0](docs/m0-acceptance.md) 验收记录。
 - 所有设计取舍以 `docs/architecture.md`、`docs/product.md` 和 `docs/data-model.md` 为准。发生冲突时，先在 PR 中指出差异，不要静默改动核心约束。
 
 ## 目标
@@ -138,19 +139,19 @@ unset COMPOSE_PROJECT_NAME WEB_PORT
 
 基础脚本检查首页和静态资源、API 代理与错误路由、重复迁移、`pgdata` 卷挂载、数据库重启前后迁移版本一致以及 worker 正常退出。
 
-M1 的 `scripts/smoke-journal.py` 与 `scripts/smoke-browser.mjs` 会写入并软删除隔离测试日记，需要明确的测试项目名和临时 owner 密码，完整执行顺序见 [M1 交接](docs/m1-handoff.md)。CI 自动执行 HTTP、PostgreSQL 重启持久化与真实 Chrome 录入/冲突/修订/退出检查。
+`scripts/smoke-journal.py` 与 `scripts/smoke-browser.mjs` 会写入并软删除隔离测试日记，需要明确的测试项目名和临时 owner 密码，完整执行顺序见 [M2 第一片交接](docs/m2-handoff.md)。CI 自动执行 HTTP、PostgreSQL 重启持久化、真实 Chrome 录入/冲突/修订/退出，以及月历计数、日期详情与跨视图草稿保留检查。
 
 ## 代码目录
 
 ```text
-apps/web/         React 登录、日记、编辑器适配层、Vite 与前端测试
-apps/server/      FastAPI 认证/日记、SQLAlchemy、Alembic、独立 worker 与测试
+apps/web/         React 登录、日记、月历/日期详情、编辑器适配层与测试
+apps/server/      FastAPI 认证/日记/日期聚合、SQLAlchemy、Alembic、独立 worker 与测试
 infra/Caddyfile   静态 SPA 与 /api 代理
 compose.yaml      web / api / postgres；worker 为可选 profile
 scripts/          安全环境初始化、隔离 Compose / HTTP / Chrome 验收
 tests/            环境初始化的标准库测试
 .github/workflows/ci.yml
-docs/             产品/架构设计、M0 / M1 验收与后续交接
+docs/             产品/架构设计、各任务验收与后续交接
 tasks/            严格按顺序执行的里程碑工单
 ```
 
@@ -165,11 +166,14 @@ tasks/            严格按顺序执行的里程碑工单
 - `docs/roadmap.md` — 里程碑、验收标准
 - `tasks/00-foundation.md` — 第一张可执行工单
 - `tasks/01-journal.md` — 第二张可执行工单
+- `tasks/02-calendar-days.md` — M2 第一片：月历和日期详情
 - `docs/decisions.md` — 核心技术决策
 - `docs/m0-handoff.md` — M0 实现边界、代码入口和 M1 交接
 - `docs/m0-acceptance.md` — 可复核的检查结果与运行限制
 - `docs/m1-handoff.md` — 日记与认证的实现入口、运行约定和后续边界
 - `docs/m1-acceptance.md` — M1 本机与 CI 验收证据
+- `docs/m2-handoff.md` — 月历和日期详情的实现入口、运行与后续边界
+- `docs/m2-acceptance.md` — M2 第一片的实际验收证据
 
 ## 免责声明
 
