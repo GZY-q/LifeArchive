@@ -29,7 +29,11 @@
 
 `scripts/smoke-browser.mjs` 在真实 Chrome 通过：原 M1 录入/IME/会话轮换/409/历史闭环、查看月历后返回继续未保存的原文和日期、补记计数、单日原始 Markdown、空日、删除后刷新计数和退出。日历与日记均在桌面 1440×1000、手机尺寸 390×844 无水平溢出；截图已检查。原文中的 HTML 未执行，localStorage/sessionStorage 为空。
 
-本机仍是原生预览链路，数据库重启持久化的容器验证由 PR CI 执行；结果待实际完成后补入，不能以本机检查代替。
+本机仍是原生预览链路，数据库重启持久化的容器验证由 PR CI 执行，不能以本机检查代替。远端结果见 [PR #3](https://github.com/GZY-q/LifeArchive/pull/3) / [CI run 40116550453](https://github.com/GZY-q/LifeArchive/actions/runs/40116550453)，功能提交为 [`1c44a70`](https://github.com/GZY-q/LifeArchive/commit/1c44a7093ac576bff57485534249bfec974b6757)。
+
+- [backend job](https://github.com/GZY-q/LifeArchive/actions/runs/40116550453/job/120938912220)：通过，111 项真实 PG 测试、4 项环境保护与 Ruff。
+- [frontend job](https://github.com/GZY-q/LifeArchive/actions/runs/40116550453/job/120938912480)：GitHub 已分配运行器，但超过 10 分钟未开始任何步骤、没有测试日志。状态查询间歇返回 502 / 超时；普通取消和强制取消均返回 202，随后重跑被拒绝，因为原运行仍在执行。这是尚未完成的远端门禁，不能声称前端或容器 CI 已通过。
+- 本文档提交将触发新一轮检查；结果需以 PR 的实际 checks 为准。确认容器构建、HTTP 重启持久化和 Chrome 验收通过之前，PR 保持草稿。
 
 ## 迁移与边界
 
