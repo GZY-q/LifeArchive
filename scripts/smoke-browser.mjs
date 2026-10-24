@@ -38,22 +38,42 @@ const chrome = spawn(
     ...(process.env.CI === 'true' ? ['--no-sandbox'] : []),
     'about:blank',
   ],
-  { stdio: 'ignore' },
+  { stdio: ['ignore', 'ignore', 'pipe'] },
 );
+let startupError = '';
+let startupLog = '';
+chrome.on('error', (error) => {
+  startupError = error.message;
+});
+chrome.stderr.setEncoding('utf8');
+chrome.stderr.on('data', (chunk) => {
+  startupLog = (startupLog + chunk).slice(-8000);
+});
 let socket;
 try {
   let port;
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  for (let attempt = 0; attempt < 300; attempt += 1) {
+    if (startupError || chrome.exitCode !== null || chrome.signalCode !== null)
+      throw new Error(
+        `Chrome startup failed (${startupError || (chrome.exitCode ?? chrome.signalCode)}): ${startupLog}`,
+      );
     try {
-      port = (
+      const candidate = (
         await readFile(join(directory, 'DevToolsActivePort'), 'utf8')
       ).split('\n')[0];
-      break;
+      if (/^\d+$/u.test(candidate)) {
+        port = candidate;
+        break;
+      }
     } catch {
-      await delay(100);
+      // Chrome may still be starting or writing its endpoint file.
     }
+    await delay(100);
   }
-  if (!port) throw new Error('Chrome did not provide a debugging endpoint');
+  if (!port)
+    throw new Error(
+      `Chrome did not provide a debugging endpoint: ${startupLog}`,
+    );
   const browser = await (
     await fetch(`http://127.0.0.1:${port}/json/version`)
   ).json();

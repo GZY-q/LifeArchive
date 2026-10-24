@@ -33,7 +33,8 @@
 
 - [backend job](https://github.com/GZY-q/LifeArchive/actions/runs/40116550453/job/120938912220)：通过，111 项真实 PG 测试、4 项环境保护与 Ruff。
 - [frontend job](https://github.com/GZY-q/LifeArchive/actions/runs/40116550453/job/120938912480)：GitHub 已分配运行器，但超过 10 分钟未开始任何步骤、没有测试日志。状态查询间歇返回 502 / 超时；普通取消和强制取消均返回 202，随后重跑被拒绝，因为原运行仍在执行。这是尚未完成的远端门禁，不能声称前端或容器 CI 已通过。
-- 本文档提交将触发新一轮检查；结果需以 PR 的实际 checks 为准。确认容器构建、HTTP 重启持久化和 Chrome 验收通过之前，PR 保持草稿。
+- [复验 run 40117397893](https://github.com/GZY-q/LifeArchive/actions/runs/40117397893)：前端和后端均通过；容器构建、基础验收、M2 HTTP 与数据库重启持久化全部通过。Chrome 在进入页面前未能提供调试端口，原脚本没有输出启动日志。已将启动等待改为最多 30 秒，处理启动失败/提前退出、保留有界错误日志并等待完整端口文件；需要再由 CI 验证 Linux 浏览器链路。
+- 确认 Chrome 验收通过之前，PR 保持草稿；不能把已经通过的 HTTP 持久化检查等同于浏览器验收。
 
 ## 迁移与边界
 
