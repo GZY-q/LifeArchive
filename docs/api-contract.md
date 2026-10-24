@@ -1,6 +1,6 @@
 # API contract — /api/v1
 
-M1 已实现 health、owner 会话和最小日记闭环。下方 V1 全量资源表仍包含未来草案，未列入本节的资源尚未实现。
+M1 已实现 health、owner 会话和最小日记闭环；M2 第一片扩展月历和日记日期详情。下方 V1 全量资源表仍包含未来草案，未列入已实现章节的资源尚未实现。
 
 ## M1 已实现
 
@@ -16,6 +16,13 @@ M1 已实现 health、owner 会话和最小日记闭环。下方 V1 全量资源
 - `DELETE /entries/{id}?expected_revision=N`：原子修订检查后软删除，204；保留原文和历史并创建最终快照。没有永久删除/恢复接口。
 - `GET /entries/{id}/revisions?limit=20&before_revision=N`：`{items,next_cursor}`，快照包含 `{revision,content_md,entry_date,changed_at,editor_id}`；按 revision 降序，next_cursor 是下一页的 before_revision。创建时即保留 revision 1。
 - 所有 instants 为 UTC、带时区；`entry_date` 是独立用户日历日期。格式错误 422 使用通用响应，不回显密码、原文或提交值。
+
+## M2 第一片：月历与日详情
+
+- `GET /calendar?year=YYYY&month=M`：返回 `{year,month,days:[{date,entry_count}]}`。year 为 1–9999，month 为 1–12；days 按日期升序，仅包含有记录的日期，空月为 `[]`。
+- `GET /days/{entry_date}?limit=20&cursor=...`：返回 `{date,entries:{items,next_cursor}}`。日期严格为 `YYYY-MM-DD`；limit 1–100，默认 20。条目与 M1 的 EntryResponse 相同，按创建时间与 ID 降序；next_cursor 原样传回，不能跨日期使用。空日为 200 / 空 items。
+- 两接口均要求有效会话、仅含当前 owner 未删除的日记，并返回 `Cache-Control: no-store`。月历计数直接按 `entry_date` 聚合，不按 UTC 创建时间重新分日。分页沿用 M1 的继续位置语义，不是数据库快照。
+- 日详情只含日记原文，不输出尚未实现的新闻、摘要或事件字段；没有新的写入接口或数据库迁移。
 
 ## V1 全量资源规划
 

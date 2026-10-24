@@ -18,7 +18,7 @@ export type EntryRevision = Pick<
 export type EntryInput = Pick<Entry, 'content_md' | 'entry_date'>;
 export type CreateInput = EntryInput & { client_request_id: string };
 
-function entryFrom(value: unknown): Entry {
+export function entryFrom(value: unknown): Entry {
   if (
     !isRecord(value) ||
     typeof value.id !== 'string' ||

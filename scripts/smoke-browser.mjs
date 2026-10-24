@@ -124,7 +124,7 @@ try {
   }
   async function click(label) {
     await evaluate(
-      `(() => { const button = [...document.querySelectorAll('button')].find(item => item.textContent.trim() === ${JSON.stringify(label)}); if (!button || button.disabled) throw Error('Button unavailable'); button.click(); })()`,
+      `(() => { const button = [...document.querySelectorAll('button')].find(item => item.getClientRects().length > 0 && item.textContent.trim() === ${JSON.stringify(label)}); if (!button || button.disabled) throw Error('Button unavailable'); button.click(); })()`,
     );
   }
   async function type(selector, text) {
@@ -132,6 +132,14 @@ try {
       `(() => { const input = document.querySelector(${JSON.stringify(selector)}); input.focus(); input.select(); })()`,
     );
     await cdp('Input.insertText', { text });
+  }
+  async function selectCalendarDate(date) {
+    await evaluate(
+      `(() => { const input = document.querySelector('#calendar-date'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(date)}); input.dispatchEvent(new Event('input', { bubbles: true })); })()`,
+    );
+    await wait(
+      `Boolean(document.querySelector('section[aria-label="${date} 的日记"]'))`,
+    );
   }
   const api = (expression) => evaluate(`(async () => { ${expression} })()`);
   await cdp('Page.enable');
@@ -171,6 +179,20 @@ try {
   await evaluate(
     '(() => { const input = document.querySelector("#entry-date"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, "2001-02-03"); input.dispatchEvent(new Event("input", { bubbles: true })); })()',
   );
+  await click('日历');
+  await wait('Boolean(document.querySelector("#calendar-date"))');
+  await selectCalendarDate('2001-02-03');
+  await click('日记');
+  await wait(
+    'document.querySelector("#journal-content").getClientRects().length > 0',
+  );
+  if (
+    (await evaluate('document.querySelector("#journal-content").value')) !==
+      original ||
+    (await evaluate('document.querySelector("#entry-date").value')) !==
+      '2001-02-03'
+  )
+    throw new Error('Calendar navigation lost unsaved Markdown or date');
   await click('保存日记');
   await wait('Boolean(document.querySelector("article.entry-card"))');
   const first = await api(
@@ -219,6 +241,28 @@ try {
   console.log(
     'PASS: real login, IME, raw Markdown/date, rotated session recovery, 409 draft recovery and revision UI',
   );
+  await click('日历');
+  await wait('Boolean(document.querySelector("#calendar-date"))');
+  await selectCalendarDate('2001-02-03');
+  await wait(
+    'Boolean(document.querySelector(\'button[aria-label="2001-02-03，1 篇日记"]\'))',
+  );
+  await wait(
+    `document.querySelector('section[aria-label="2001-02-03 的日记"] pre')?.textContent === ${JSON.stringify(draft)}`,
+  );
+  await selectCalendarDate('2001-02-04');
+  await wait(
+    'document.querySelector(\'section[aria-label="2001-02-04 的日记"]\')?.textContent.includes("这一天还没有日记")',
+  );
+  await selectCalendarDate('2001-02-03');
+  await wait(
+    `document.querySelector('section[aria-label="2001-02-03 的日记"] pre')?.textContent === ${JSON.stringify(draft)}`,
+  );
+  if (await evaluate('window.__unsafe === true'))
+    throw new Error('Day view executed unsafe Markdown');
+  console.log(
+    'PASS: calendar preserves draft, counts backdated journal, reads raw day Markdown and handles empty days',
+  );
   for (const [name, width, height, mobile] of [
     ['desktop', 1440, 1000, false],
     ['mobile', 390, 844, true],
@@ -229,33 +273,51 @@ try {
       deviceScaleFactor: 1,
       mobile,
     });
-    await evaluate('window.scrollTo(0, 0)');
-    const dimensions = await evaluate(
-      '({ width:innerWidth, scroll:document.documentElement.scrollWidth })',
-    );
-    if (dimensions.scroll > dimensions.width)
-      throw new Error(`${name} horizontal overflow`);
-    if (process.env.LIFEARCHIVE_BROWSER_ARTIFACT_DIR) {
-      await mkdir(process.env.LIFEARCHIVE_BROWSER_ARTIFACT_DIR, {
-        recursive: true,
-      });
-      const screenshot = await cdp('Page.captureScreenshot', {
-        format: 'png',
-        captureBeyondViewport: false,
-      });
-      await writeFile(
-        join(process.env.LIFEARCHIVE_BROWSER_ARTIFACT_DIR, `${name}.png`),
-        Buffer.from(screenshot.data, 'base64'),
+    for (const view of ['日历', '日记']) {
+      await click(view);
+      await evaluate('window.scrollTo(0, 0)');
+      const dimensions = await evaluate(
+        '({ width:innerWidth, scroll:document.documentElement.scrollWidth })',
+      );
+      if (dimensions.scroll > dimensions.width)
+        throw new Error(`${name} ${view} horizontal overflow`);
+      if (process.env.LIFEARCHIVE_BROWSER_ARTIFACT_DIR) {
+        await mkdir(process.env.LIFEARCHIVE_BROWSER_ARTIFACT_DIR, {
+          recursive: true,
+        });
+        const screenshot = await cdp('Page.captureScreenshot', {
+          format: 'png',
+          captureBeyondViewport: false,
+        });
+        const filename = `${view === '日历' ? 'calendar-' : ''}${name}.png`;
+        await writeFile(
+          join(process.env.LIFEARCHIVE_BROWSER_ARTIFACT_DIR, filename),
+          Buffer.from(screenshot.data, 'base64'),
+        );
+      }
+      console.log(
+        `PASS: ${name} ${view} layout ${width}x${height} without horizontal overflow`,
       );
     }
-    console.log(
-      `PASS: ${name} layout ${width}x${height} without horizontal overflow`,
-    );
   }
   allowDialog = true;
   await click('删除');
   await wait('document.querySelectorAll("article.entry-card").length === 0');
   allowDialog = false;
+  await click('日历');
+  await wait(
+    '[...document.querySelectorAll("button")].some(item => item.textContent.trim() === "刷新日历" && !item.disabled)',
+  );
+  await click('刷新日历');
+  await wait(
+    'Boolean(document.querySelector(\'button[aria-label="2001-02-03，0 篇日记"]\'))',
+  );
+  await wait(
+    'document.querySelector(\'section[aria-label="2001-02-03 的日记"]\')?.textContent.includes("这一天还没有日记")',
+  );
+  console.log(
+    'PASS: deleted journal disappears from calendar counts and day detail',
+  );
   await click('退出登录');
   await wait('Boolean(document.querySelector("#username"))');
   if (
