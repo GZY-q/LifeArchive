@@ -29,12 +29,17 @@
 
 `scripts/smoke-browser.mjs` 在真实 Chrome 通过：原 M1 录入/IME/会话轮换/409/历史闭环、查看月历后返回继续未保存的原文和日期、补记计数、单日原始 Markdown、空日、删除后刷新计数和退出。日历与日记均在桌面 1440×1000、手机尺寸 390×844 无水平溢出；截图已检查。原文中的 HTML 未执行，localStorage/sessionStorage 为空。
 
-本机仍是原生预览链路，数据库重启持久化的容器验证由 PR CI 执行，不能以本机检查代替。远端结果见 [PR #3](https://github.com/GZY-q/LifeArchive/pull/3) / [CI run 40116550453](https://github.com/GZY-q/LifeArchive/actions/runs/40116550453)，功能提交为 [`1c44a70`](https://github.com/GZY-q/LifeArchive/commit/1c44a7093ac576bff57485534249bfec974b6757)。
+容器门禁已在 [PR #3](https://github.com/GZY-q/LifeArchive/pull/3) 的 [CI run 40117718823](https://github.com/GZY-q/LifeArchive/actions/runs/40117718823) 全部通过。功能提交为 [`1c44a70`](https://github.com/GZY-q/LifeArchive/commit/1c44a7093ac576bff57485534249bfec974b6757)，包含浏览器启动改进的验收提交为 [`e971661`](https://github.com/GZY-q/LifeArchive/commit/e9716618828463968c60ecc6833bfd3d7455466d)。
 
-- [backend job](https://github.com/GZY-q/LifeArchive/actions/runs/40116550453/job/120938912220)：通过，111 项真实 PG 测试、4 项环境保护与 Ruff。
-- [frontend job](https://github.com/GZY-q/LifeArchive/actions/runs/40116550453/job/120938912480)：GitHub 已分配运行器，但超过 10 分钟未开始任何步骤、没有测试日志。状态查询间歇返回 502 / 超时；普通取消和强制取消均返回 202，随后重跑被拒绝，因为原运行仍在执行。这是尚未完成的远端门禁，不能声称前端或容器 CI 已通过。
-- [复验 run 40117397893](https://github.com/GZY-q/LifeArchive/actions/runs/40117397893)：前端和后端均通过；容器构建、基础验收、M2 HTTP 与数据库重启持久化全部通过。Chrome 在进入页面前未能提供调试端口，原脚本没有输出启动日志。已将启动等待改为最多 30 秒，处理启动失败/提前退出、保留有界错误日志并等待完整端口文件；需要再由 CI 验证 Linux 浏览器链路。
-- 确认 Chrome 验收通过之前，PR 保持草稿；不能把已经通过的 HTTP 持久化检查等同于浏览器验收。
+| CI job | 结果 |
+| --- | --- |
+| [backend](https://github.com/GZY-q/LifeArchive/actions/runs/40117718823/job/120942410170) | 111 项真实 PG 测试、4 项环境保护、Ruff 全部通过 |
+| [frontend](https://github.com/GZY-q/LifeArchive/actions/runs/40117718823/job/120942410367) | 55 项测试、lint、格式、类型和构建全部通过 |
+| [compose](https://github.com/GZY-q/LifeArchive/actions/runs/40117718823/job/120942579824) | 镜像构建、Caddy、重复迁移、独立 worker、HTTP 重启持久化及真实 Linux Chrome 全部通过 |
+
+容器中实测 PostgreSQL 重启后会话、日记和修订仍保留；Chrome 随后完成草稿跨视图、补记计数、原文/空日、桌面/手机尺寸、删除和退出闭环。验收不依赖 worker 或 LLM。
+
+排查记录：[首轮](https://github.com/GZY-q/LifeArchive/actions/runs/40116550453) 的前端运行器分配后超过 10 分钟无步骤，状态服务间歇超时，取消后重跑一度被 GitHub 以原运行仍执行为由拒绝。[下一轮](https://github.com/GZY-q/LifeArchive/actions/runs/40117397893) 恢复前后端与 HTTP 检查，但 Chrome 在原 10 秒等待内没有提供端口。启动等待改为最多 30 秒，并增加有界日志、提前退出诊断和完整端口文件检查后，以上最终验收全部通过；本机 Chrome 和公开 dummy 启动失败场景也已复验。
 
 ## 迁移与边界
 
