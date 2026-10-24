@@ -1,6 +1,6 @@
-# LifeArchive Web · M0
+# LifeArchive Web · M1
 
-仅实现品牌首页、不可用的后续导航占位和 API 连接检查。没有日记编辑、登录、路由、持久化、新闻或 AI 功能。完整部署与验收步骤见仓库根目录 `README.md`。
+实现 owner 登录、日记录入/列表/编辑/删除确认、版本比对和修订历史，以及健康指示。草稿仅在页面内存；会话失效时隐藏私密 DOM，重新登录可继续同页草稿。完整部署和边界见根 README 与 `docs/m1-handoff.md`。
 
 ## 本地开发
 
@@ -37,22 +37,28 @@ npm run build
 
 ## 后续实现入口
 
-| 文件                                 | 职责                                   |
-| ------------------------------------ | -------------------------------------- |
-| `src/App.tsx`                        | 当前首页与导航占位，后续页面从这里接入 |
-| `src/api/health.ts`                  | 同源健康请求及响应校验                 |
-| `src/components/HealthIndicator.tsx` | 请求状态、8 秒超时、取消与手动重试     |
-| `src/styles.css`                     | 移动端适配、键盘焦点和基础视觉样式     |
-| `src/App.test.tsx`                   | 首页和连接状态的行为测试               |
-| `vite.config.ts`                     | 开发代理、Vitest 配置                  |
+| 文件                                 | 职责                                              |
+| ------------------------------------ | ------------------------------------------------- |
+| `src/App.tsx`                        | 当前首页与导航占位，后续页面从这里接入            |
+| `src/auth/`                          | 登录边界、重新验证和显式退出                      |
+| `src/api/`                           | typed 同源客户端、响应校验、15 秒超时、CSRF       |
+| `src/journal/`                       | 日期、创建重试 UUID、列表、409 草稿比对与修订历史 |
+| `src/components/MarkdownEditor.tsx`  | 受控原文适配、IME composition 状态                |
+| `src/api/health.ts`                  | 同源健康请求及响应校验                            |
+| `src/components/HealthIndicator.tsx` | 请求状态、8 秒超时、取消与手动重试                |
+| `src/styles.css`                     | 移动端适配、键盘焦点和基础视觉样式                |
+| `src/App.test.tsx`                   | 首页和连接状态的行为测试                          |
+| `vite.config.ts`                     | 开发代理、Vitest 配置                             |
 
 健康响应约定为 HTTP 2xx 且 JSON `{ "status": "ok" }`；它只说明 API 可响应，不代表数据库、鉴权或全部功能可用。前端不展示服务内部错误信息。请求仅在挂载或用户手动检查时触发，没有后台轮询。
 
-测试覆盖初始加载、成功、HTTP 错误、错误结构、非 JSON、网络错误后重试和超时。M1 才开始日记与登录，需重新阅读 `tasks/01-journal.md`，明确会话与 CSRF 策略后再接私有接口；编辑器必须先核验 React、中文输入法和移动端兼容性。
+测试覆盖健康状态、登录与 401、CSRF、会话重新验证、创建结果不确定时的 UUID 重试、中文组合输入、补记、409 草稿保护、删除确认、分页和修订安全显示。真实 Chrome 还会运行 `scripts/smoke-browser.mjs`，验证真实 API 与布局。
+
+M1 未引入 `@usememos/editor`。已核验其正式 `26.10.25` 包存在、MIT、React peer >=18；上游仍要求真实系统 IME / 移动软键盘矩阵，因此本轮使用独立 textarea 适配层。详见 [编辑器选择记录](../../docs/m1-handoff.md)。不要将 Chrome 模拟的 composition 事件声称为全部真实键盘通过。
 
 ## 依赖依据
 
-2026-10-23 核验 npm 正式版本与以下官方文档。React/Vite 使用当前稳定版本；TypeScript 固定 6.0.3，以满足 `typescript-eslint` 的 `<6.1` peer 约束。M0 用少量普通 CSS，暂不引入 Tailwind、组件库或编辑器。
+沿用 M0 已锁定的 React/Vite 依赖，M1 不额外升级前端依赖。TypeScript 固定 6.0.3，满足 `typescript-eslint` 的 `<6.1` peer 约束；布局使用普通 CSS。依赖与设计参考：
 
 - [Vite 环境要求](https://vite.dev/guide/)
 - [Vite 开发代理](https://vite.dev/config/server-options#server-proxy)

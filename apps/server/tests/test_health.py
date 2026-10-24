@@ -17,9 +17,19 @@ def test_health_is_non_sensitive_and_does_not_need_database(
     assert response.json() == {"status": "ok"}
 
 
-@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json", "/api/v1/entries"])
-def test_only_m0_health_is_exposed(path: str) -> None:
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
+def test_api_documentation_is_not_public(path: str) -> None:
     from life_archive.main import create_app
 
     with TestClient(create_app()) as client:
         assert client.get(path).status_code == 404
+
+
+@pytest.mark.parametrize("path", ["/api/v1/auth/me", "/api/v1/entries"])
+def test_private_routes_reject_anonymous_requests_without_accessing_database(path: str) -> None:
+    from life_archive.main import create_app
+
+    with TestClient(create_app()) as client:
+        response = client.get(path)
+    assert response.status_code == 401
+    assert response.headers["cache-control"] == "no-store"

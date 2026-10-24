@@ -1,5 +1,7 @@
 # M0 开发交接
 
+这是 M0 历史交接快照；M1 已推进，当前实现和接手入口请先看 [m1-handoff.md](m1-handoff.md)。
+
 本文件面向后续接手开发者与模型。先读 `AGENTS.md`、`README.md`、产品/架构/数据模型文档和当前工单。实现状态与设计草案应分开理解，实际验收记录见 [m0-acceptance.md](m0-acceptance.md)。
 
 ## 已建立的边界

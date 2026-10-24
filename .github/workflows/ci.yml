@@ -1,7 +1,8 @@
-name: M0 foundation
+name: LifeArchive checks
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 permissions:
@@ -18,6 +19,11 @@ jobs:
     defaults:
       run:
         working-directory: apps/server
+    env:
+      TEST_POSTGRES_HOST: "127.0.0.1"
+      TEST_POSTGRES_PORT: "25432"
+      TEST_POSTGRES_USER: life_archive_tests
+      TEST_POSTGRES_DB: life_archive_tests
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -29,14 +35,35 @@ jobs:
           working-directory: apps/server
           enable-cache: true
       - run: uv sync --locked --dev
+      - name: Start isolated PostgreSQL for integration tests
+        run: |
+          life_archive_test_password="$(openssl rand -hex 32)"
+          echo "::add-mask::$life_archive_test_password"
+          printf 'TEST_POSTGRES_PASSWORD=%s\n' "$life_archive_test_password" >> "$GITHUB_ENV"
+          docker run --detach --name life-archive-pytest \
+            --publish 127.0.0.1:25432:5432 \
+            --env POSTGRES_USER=life_archive_tests \
+            --env POSTGRES_DB=life_archive_tests \
+            --env POSTGRES_PASSWORD="$life_archive_test_password" \
+            postgres:17.11-bookworm
+          for attempt in {1..40}; do
+            if docker exec life-archive-pytest pg_isready -U life_archive_tests -d life_archive_tests; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
       - run: uv run --locked ruff check .
       - run: uv run --locked ruff format --check .
-      - run: uv run --locked ruff check ../../scripts/init-env.py ../../tests
-      - run: uv run --locked ruff format --check ../../scripts/init-env.py ../../tests
+      - run: uv run --locked ruff check ../../scripts ../../tests
+      - run: uv run --locked ruff format --check ../../scripts ../../tests
       - run: uv run --locked pytest
       - name: Check environment initializer
         working-directory: .
         run: python3 -m unittest discover -s tests -v
+      - name: Stop isolated test PostgreSQL
+        if: always()
+        run: docker stop life-archive-pytest
 
   frontend:
     runs-on: ubuntu-24.04
@@ -70,15 +97,23 @@ jobs:
       POSTGRES_USER: life_archive
       POSTGRES_DB: life_archive
       WEB_PORT: "18080"
+      LIFEARCHIVE_COOKIE_SECURE: "false"
+      LIFEARCHIVE_TRUSTED_ORIGINS: '["http://127.0.0.1:18080"]'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.19.0"
       - name: Generate an ephemeral database password
         run: |
           life_archive_ci_password="$(openssl rand -hex 32)"
           echo "::add-mask::$life_archive_ci_password"
           printf 'POSTGRES_PASSWORD=%s\n' "$life_archive_ci_password" >> "$GITHUB_ENV"
+          life_archive_owner_password="$(openssl rand -hex 32)"
+          echo "::add-mask::$life_archive_owner_password"
+          printf 'LIFEARCHIVE_SMOKE_PASSWORD=%s\n' "$life_archive_owner_password" >> "$GITHUB_ENV"
       - name: Validate Compose and smoke script
         run: |
           docker compose --profile worker config --quiet
@@ -87,6 +122,15 @@ jobs:
         run: docker compose up --wait --wait-timeout 180 --build
       - name: Check routing, migration, persistence and worker
         run: bash scripts/smoke-compose.sh
+      - name: Initialize an owner in the isolated test database
+        run: |
+          printf '%s\n' "$LIFEARCHIVE_SMOKE_PASSWORD" | docker compose exec -T api \
+            python -m life_archive.cli init-owner --username m1-smoke-owner \
+            --timezone Asia/Shanghai --password-stdin
+      - name: Check the private journal across a database restart
+        run: python3 scripts/smoke-journal.py --base-url http://127.0.0.1:18080 --allow-test-writes --restart-postgres
+      - name: Check the journal in real Chrome
+        run: node scripts/smoke-browser.mjs http://127.0.0.1:18080
       - name: Show service logs on failure
         if: failure()
         run: docker compose logs --no-color --tail 150 web api postgres

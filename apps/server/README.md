@@ -1,6 +1,6 @@
-# LifeArchive 后端基础设施（M0）
+# LifeArchive API（M1）
 
-当前只有进程健康检查、配置、数据库会话与迁移骨架。没有认证、日记、新闻、AI 或任务调度器。完整启动和验收方法见仓库根目录 `README.md`。
+当前实现 health、单一 owner CLI、Argon2id 登录、可撤销会话/CSRF/限流，以及有版本和创建幂等保护的日记 CRUD。没有新闻、AI、媒体或任务调度器。完整运行和验证见根 README、`docs/m1-handoff.md`、`docs/m1-acceptance.md`。
 
 ## 开发与检查
 
@@ -15,15 +15,20 @@ uv run --locked ruff format --check .
 uv run --locked uvicorn life_archive.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
+完整集成测试还需显式配置 `TEST_POSTGRES_HOST/PORT/USER/PASSWORD/DB`，指向专门的测试数据库。每项测试迁移新的随机 schema；不提供配置会跳过 PG 测试。CI 会配置真实 PostgreSQL，不能把本机跳过当成全量通过。
+
 Python 固定为 `.python-version` 的 3.12.14，uv 固定为 `pyproject.toml` 的 0.12.17。依赖使用清华 PyPI 镜像，版本和下载哈希记录在 `uv.lock`。如镜像速度较慢，可在安装时设置 `UV_HTTP_TIMEOUT=120`；切换镜像需要重新生成并审查锁文件。
 
-`GET /api/v1/health` 始终只返回 `{"status":"ok"}`，不访问数据库，不代表数据库或未来业务可用。开发模式绑定 loopback；生产入口由 Caddy 提供。M0 关闭 OpenAPI/Swagger/ReDoc。
+`GET /api/v1/health` 始终只返回 `{"status":"ok"}`，不访问数据库，不代表数据库或业务可用。开发模式绑定 loopback；生产入口由 Caddy 提供。OpenAPI/Swagger/ReDoc 保持关闭。
 
 ## 模块与约定
 
 | 文件 | 责任 |
 | --- | --- |
-| `src/life_archive/main.py` | FastAPI 工厂与固定 `/api/v1/health` 路由 |
+| `src/life_archive/main.py` | 组装 health/auth/journal、验证错误脱敏和私密响应 no-store |
+| `src/life_archive/auth/` | owner、Argon2id、会话摘要、CSRF、共享限流、认证依赖 |
+| `src/life_archive/journal/` | owner 范围读写、原子修订、快照、分页与创建请求去重 |
+| `src/life_archive/cli.py` | 唯一 owner 初始化（密码 getpass / 显式 stdin） |
 | `src/life_archive/settings.py` | Pydantic 配置；普通应用配置和 DB 密钥分别延迟读取 |
 | `src/life_archive/db.py` | DeclarativeBase、延迟创建的 engine、每次请求独立的同步 Session |
 | `src/life_archive/worker.py` | 独立进程入口；M0 记录一条日志并正常退出 |
@@ -36,7 +41,7 @@ Python 固定为 `.python-version` 的 3.12.14，uv 固定为 `pyproject.toml` �
 
 数据库密码通过 `SecretStr` 保存，用 SQLAlchemy `URL.create()` 组合 URL，支持 `@`、`%`、`/` 等特殊字符。不要打印 URL 的明文密码或配置对象的底层值。SQL 参数不写入数据库异常日志；连接会话时区固定为 UTC。
 
-业务服务显式管理事务，例如 `with session.begin(): ...`；`get_db_session()` 只负责关闭连接和回滚未提交事务，绝不自动提交。同步数据库访问应放在普通 `def` 路由/依赖中，避免阻塞异步事件循环。表结构只经 Alembic 修改，不在 API 启动时执行 `create_all()` 或自动迁移。
+业务服务显式管理提交和回滚；`get_db_session()` 只负责关闭连接和回滚未提交事务，绝不自动提交。认证查询可能已经开启事务，不要在 journal 服务再嵌套 `session.begin()`。同步数据库访问应放在普通 `def` 路由/依赖中，避免阻塞异步事件循环。表结构只经 Alembic 修改，不在 API 启动时执行 `create_all()` 或自动迁移。
 
 ## 迁移与下一阶段
 
@@ -53,8 +58,8 @@ docker compose exec -T api alembic upgrade head
 docker compose exec -T api alembic current
 ```
 
-M1 新增 ORM 模型时，继承 `Base`，在 `alembic/env.py` 中导入模型，再生成并审查新迁移。不要修改已应用的基线迁移；不得一次创建 `docs/data-model.md` 中的全部未来表。真实 PostgreSQL 的连接、重复迁移和重启持久化需要运行集成验收；单元测试中的 SQLite 仅验证 Session 的提交/回滚行为。
+新增 ORM 模型时继承 `Base`，在 `alembic/env.py` 中导入模型，再生成并审查新迁移。M1 的 head 为 `0003_journal`，迁移也创建认证表。不要修改已应用的迁移；不要一次创建设计文档中的全部未来表。单元测试中的 SQLite 仅验证基础 Session 行为，业务、并发和迁移用真实 PostgreSQL。
 
-后续范围严格以 `tasks/01-journal.md` 为准。继续保持 API 与 worker 入口独立；M0 worker 使用 `python -m life_archive.worker`，没有调度器、业务任务或常驻循环。
+当前实现范围以 `tasks/01-journal.md` 为准；后续仅执行明确分配的工单。继续保持 API 与 worker 入口独立；worker 使用 `python -m life_archive.worker`，没有调度器、业务任务或常驻循环。
 
 实现依据：[SQLAlchemy URL](https://docs.sqlalchemy.org/en/20/core/engines.html#creating-urls-programmatically)、[Session 生命周期](https://docs.sqlalchemy.org/en/20/orm/session_basics.html)、[Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)、[Alembic 教程](https://alembic.sqlalchemy.org/en/latest/tutorial.html)、[uv 容器部署](https://docs.astral.sh/uv/guides/integration/docker/)。

@@ -10,6 +10,8 @@ x-backend: &backend
     POSTGRES_DB: ${POSTGRES_DB:-life_archive}
     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run python3 scripts/init-env.py first}
     LIFEARCHIVE_LOG_LEVEL: ${LIFEARCHIVE_LOG_LEVEL:-INFO}
+    LIFEARCHIVE_COOKIE_SECURE: ${LIFEARCHIVE_COOKIE_SECURE:-true}
+    LIFEARCHIVE_TRUSTED_ORIGINS: '${LIFEARCHIVE_TRUSTED_ORIGINS:-["http://127.0.0.1:8080","http://127.0.0.1:5173"]}'
   init: true
   security_opt:
     - no-new-privileges:true

@@ -6,9 +6,9 @@ LifeArchive 是一个独立实现、单用户优先、自托管、面向几十�
 
 ## 当前状态
 
-- 已实现 M0 基础设施：品牌首页、健康接口、数据库连接模块、迁移基线和容器配置；**不是已完成的日记产品**。
-- 尚未实现登录、日记 CRUD、媒体、新闻、AI 或备份。M0 验收通过后再执行 `tasks/01-journal.md`。
-- 实际执行结果见 [M0 验收记录](docs/m0-acceptance.md)，扩展入口与下一步见 [开发交接](docs/m0-handoff.md)。
+- 已完成 M0 基础设施；M1 提供单一 owner 登录、私密会话、日记 CRUD、原文修订历史、补记日期、分页与并发冲突保护。
+- 编辑器通过独立适配层使用原生 Markdown 文本域；第三方编辑器的中文 IME / 移动端兼容验证仍需补齐。媒体、标签、日历、新闻、AI 与备份尚未实现。
+- 运行与限制见 [M1 交接](docs/m1-handoff.md)，实际检查见 [M1 验收记录](docs/m1-acceptance.md)。历史基础设施证据保留在 [M0 验收记录](docs/m0-acceptance.md)。
 - 所有设计取舍以 `docs/architecture.md`、`docs/product.md` 和 `docs/data-model.md` 为准。发生冲突时，先在 PR 中指出差异，不要静默改动核心约束。
 
 ## 目标
@@ -28,7 +28,7 @@ LifeArchive 是一个独立实现、单用户优先、自托管、面向几十�
 - AI: 可更换的 LLM Adapter，结构化输出 + 服务端校验；不允许 LLM 任意 SQL / Shell 操作。
 - Infra: Caddy、Docker Compose、私有媒体存储，后期 Restic 异地备份。
 
-## 从零启动 M0
+## 从零启动
 
 要求 Docker Engine / Docker Desktop 与现代 Docker Compose 插件（支持 `up --wait`）；以下命令在仓库根目录执行。环境初始化脚本需要 Python 3，不会覆盖已有 `.env`，生成的密码不会打印或进入 Git。
 
@@ -37,14 +37,19 @@ python3 scripts/init-env.py
 docker compose config --quiet
 docker compose up -d --build --wait
 docker compose exec -T api alembic upgrade head
+docker compose exec api python -m life_archive.cli init-owner --username owner --timezone Asia/Shanghai
 curl --fail http://127.0.0.1:8080/api/v1/health
 ```
 
-打开 [本地首页](http://127.0.0.1:8080)，健康状态应显示 API 可用；接口返回 `{"status":"ok"}`。该接口只检查 API 存活，不表示数据库、迁移或未来业务依赖就绪。数据库就绪由 Compose 的 PostgreSQL healthcheck 检查；迁移是显式操作，不在 API 启动时运行。
+初始化 owner 时输入并确认至少 15 字符的密码，不通过命令行参数传密码。数据库约束保证仅一名 owner，重复初始化会拒绝且不修改现有账户。打开 [本地首页](http://127.0.0.1:8080)，用刚初始化的账户登录。没有公开注册页面或 HTTP 初始化接口。
+
+健康接口返回 `{"status":"ok"}`，只表示 API 存活；数据库就绪由 Compose 的 PostgreSQL healthcheck 检查，迁移是显式操作，不在 API 启动时运行。
 
 `.env.example` 仅含占位值，不能直接作为有效密码使用。初始化脚本以 `0600` 权限新建 `.env`；已有文件时退出且不修改。手工配置时使用至少 16 字符随机数据库密码。修改 `WEB_PORT` 可换 Web 端口。Compose 内数据库固定使用 `postgres:5432`，不发布数据库、API 或 worker 端口；本机 API 开发时可以覆盖 `POSTGRES_HOST` / `POSTGRES_PORT`。
 
-M0 默认仅绑定 `127.0.0.1`，Caddy 提供 HTTP 开发入口。尚无认证与公网 HTTPS 部署配置，不能当作可存放私人数据的生产发布。`web` 将 `/api`、`/api/*` 原样转发到 API，其他路径支持 SPA 回退。
+默认仅绑定 `127.0.0.1`，Caddy 提供 HTTP 开发入口。`.env.example` 显式配置 `LIFEARCHIVE_COOKIE_SECURE=false`，仅用于 loopback HTTP；应用默认值为 `true`。从 M0 升级且保留已有 `.env` 时，需要手动补入该配置才能在本机 HTTP 下使用会话。`LIFEARCHIVE_TRUSTED_ORIGINS` 是 JSON 数组，默认信任 `http://127.0.0.1:8080` 和 `http://127.0.0.1:5173`；修改 Web 端口时应同步更新。
+
+非 loopback 来源必须使用 HTTPS 且启用 Secure cookie，配置不满足时会拒绝认证请求。公网 TLS 部署与备份尚未完成，不等同于生产发布。`web` 将 `/api`、`/api/*` 原样转发到 API，其他路径支持 SPA 回退。
 
 ### 生命周期与迁移
 
@@ -60,7 +65,7 @@ docker compose exec -T api alembic upgrade head
 docker compose --profile worker run --rm --no-deps worker
 ```
 
-Worker 与 API 共享后端镜像，最后一条命令仅记录“尚未配置任务”后成功退出。M0 默认不启动 worker，也没有调度器或空转循环。Alembic 基线没有业务表，只留下 `alembic_version`；升级可重复执行。
+Worker 与 API 共享后端镜像，最后一条命令仅记录“尚未配置任务”后成功退出；日记不依赖 worker 或 LLM。迁移链为 `0001_foundation` → `0002_owner_sessions` → `0003_journal`，升级可重复执行。后两条新增 owner、会话、限流、日记和修订表。不要直接回滚含日记数据的迁移；先制定备份/恢复方案。
 
 **重置测试数据（破坏性操作，仅在确认测试卷可丢弃后手动执行）：**
 
@@ -94,7 +99,9 @@ npm ci --registry=https://registry.npmmirror.com
 npm run dev
 ```
 
-打开 [前端开发页](http://127.0.0.1:5173)。Vite 将 `/api` 代理到 `127.0.0.1:8000`；`API_PROXY_TARGET` 可调整开发代理地址。健康页不访问数据库，因此这两个开发进程可以独立检查前后端连接。数据库迁移仍使用 Compose 命令；本机直接运行 Alembic 时需提供可达的 PostgreSQL 配置。
+打开 [前端开发页](http://127.0.0.1:5173)。Vite 将 `/api` 代理到 `127.0.0.1:8000`；`API_PROXY_TARGET` 可调整开发代理地址。只做前端开发时，也可用 `API_PROXY_TARGET=http://127.0.0.1:8080 npm run dev` 连接 Compose 中的 API。
+
+健康接口可独立运行；登录和日记必须连接已迁移的真实 PostgreSQL。本机直接运行后端或 Alembic 时，设置可达的 `POSTGRES_HOST` / `POSTGRES_PORT` / `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB`，并先运行迁移和 owner 初始化。不要为开发公开数据库公网端口。
 
 ```bash
 # 仓库根目录
@@ -102,8 +109,8 @@ python3 -m unittest discover -s tests -v
 
 # apps/server
 uv run --locked pytest
-uv run --locked ruff check . ../../scripts/init-env.py ../../tests
-uv run --locked ruff format --check . ../../scripts/init-env.py ../../tests
+uv run --locked ruff check . ../../scripts ../../tests
+uv run --locked ruff format --check . ../../scripts ../../tests
 
 # apps/web
 npm run lint
@@ -112,6 +119,8 @@ npm run typecheck
 npm test
 npm run build
 ```
+
+真实 PostgreSQL 测试还需显式设置 `TEST_POSTGRES_HOST`、`TEST_POSTGRES_PORT`、`TEST_POSTGRES_USER`、`TEST_POSTGRES_PASSWORD`、`TEST_POSTGRES_DB`。密码从私密环境读取，勿写入命令历史。每项集成测试迁移一个随机独立 schema，保留便于排查；不重置应用数据库。不提供测试连接时会跳过这些测试，不能据此宣称 M1 全量通过。CI 自动启动独立 PostgreSQL 并运行全部测试。
 
 ### 隔离的完整验收
 
@@ -127,19 +136,21 @@ docker compose down
 unset COMPOSE_PROJECT_NAME WEB_PORT
 ```
 
-脚本检查首页和静态资源、API 代理与错误路由、重复迁移、`pgdata` 卷挂载、数据库重启前后迁移版本一致以及 worker 正常退出。CI 自动运行单元检查和相同的 Compose 验收。详见 [验收记录](docs/m0-acceptance.md)。
+基础脚本检查首页和静态资源、API 代理与错误路由、重复迁移、`pgdata` 卷挂载、数据库重启前后迁移版本一致以及 worker 正常退出。
+
+M1 的 `scripts/smoke-journal.py` 与 `scripts/smoke-browser.mjs` 会写入并软删除隔离测试日记，需要明确的测试项目名和临时 owner 密码，完整执行顺序见 [M1 交接](docs/m1-handoff.md)。CI 自动执行 HTTP、PostgreSQL 重启持久化与真实 Chrome 录入/冲突/修订/退出检查。
 
 ## 代码目录
 
 ```text
-apps/web/         React 首页、健康状态、Vite、前端测试与锁文件
-apps/server/      FastAPI、配置、SQLAlchemy 会话、Alembic、worker 入口与测试
+apps/web/         React 登录、日记、编辑器适配层、Vite 与前端测试
+apps/server/      FastAPI 认证/日记、SQLAlchemy、Alembic、独立 worker 与测试
 infra/Caddyfile   静态 SPA 与 /api 代理
 compose.yaml      web / api / postgres；worker 为可选 profile
-scripts/          安全环境初始化、隔离 Compose 验收
+scripts/          安全环境初始化、隔离 Compose / HTTP / Chrome 验收
 tests/            环境初始化的标准库测试
 .github/workflows/ci.yml
-docs/             产品/架构设计、M0 验收与后续交接
+docs/             产品/架构设计、M0 / M1 验收与后续交接
 tasks/            严格按顺序执行的里程碑工单
 ```
 
@@ -157,6 +168,8 @@ tasks/            严格按顺序执行的里程碑工单
 - `docs/decisions.md` — 核心技术决策
 - `docs/m0-handoff.md` — M0 实现边界、代码入口和 M1 交接
 - `docs/m0-acceptance.md` — 可复核的检查结果与运行限制
+- `docs/m1-handoff.md` — 日记与认证的实现入口、运行约定和后续边界
+- `docs/m1-acceptance.md` — M1 本机与 CI 验收证据
 
 ## 免责声明
 
