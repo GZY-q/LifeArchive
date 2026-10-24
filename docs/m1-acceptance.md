@@ -34,9 +34,15 @@ Chrome composition 与手机尺寸模拟不能替代所有真实系统中文键�
 
 ## 容器验收
 
-本机无 Docker Engine，容器构建、Docker 网络中的 owner/日记和容器 PostgreSQL 重启验收由本 PR 的 CI 执行，结果将在实际完成后补入。CI 包含 backend（真实独立 PG）、frontend、compose；compose 运行原有基础验收、M1 HTTP + 重启持久化、Chrome 日记闭环。
+本机无 Docker Engine；容器门禁已在 [PR #2](https://github.com/GZY-q/LifeArchive/pull/2) 的 [CI run 40097908622](https://github.com/GZY-q/LifeArchive/actions/runs/40097908622) 全部通过。对应功能提交为 [`25b885e`](https://github.com/GZY-q/LifeArchive/commit/25b885e9a4e063aebd813e9fc687027098dd4f61)。
 
-当前本机 HTTP / Chrome 检查使用原生程序，不能替代这一容器门禁。
+| CI job | 结果 |
+| --- | --- |
+| [backend](https://github.com/GZY-q/LifeArchive/actions/runs/40097908622/job/120883916998) | 78 项真实 PG 测试、4 项环境保护测试、Ruff 通过，零跳过 |
+| [frontend](https://github.com/GZY-q/LifeArchive/actions/runs/40097908622/job/120883916840) | lint、格式、类型、27 项测试与构建通过 |
+| [compose](https://github.com/GZY-q/LifeArchive/actions/runs/40097908622/job/120884040541) | 镜像构建、Caddy 路由、重复迁移、worker 独立退出、HTTP 与 Chrome 全部通过 |
+
+Compose 实测 PostgreSQL 重启后，owner 会话和已编辑日记的修订/内容仍保留；Chrome 随后完成会话轮换恢复、IME、补记、冲突处理、历史、删除和退出。容器检查没有依赖 worker 或 LLM。CI 停止容器时保留测试数据卷，未执行破坏性回滚。
 
 ## 迁移与交付限制
 
