@@ -5,14 +5,16 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import create_engine, pool
 
+from life_archive.auth import models as auth_models  # noqa: F401 -- register model metadata
 from life_archive.db import Base
+from life_archive.journal import models as journal_models  # noqa: F401 -- register model metadata
 from life_archive.settings import get_database_settings
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name, disable_existing_loggers=False)
 
-# M0 intentionally has no business models. Import M1 models here before autogeneration.
+# All implemented models must be imported here before migration autogeneration.
 target_metadata = Base.metadata
 
 
@@ -29,6 +31,12 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
+    supplied_connection = config.attributes.get("connection")
+    if supplied_connection is not None:
+        context.configure(connection=supplied_connection, target_metadata=target_metadata)
+        with context.begin_transaction():
+            context.run_migrations()
+        return
     engine = create_engine(
         get_database_settings().url,
         poolclass=pool.NullPool,

@@ -196,6 +196,275 @@ a:focus-visible {
   outline: none;
 }
 
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #4e6248;
+  outline-offset: 3px;
+}
+
+.login-panel {
+  max-width: 520px;
+  padding: 56px 0 24px;
+}
+
+.login-panel h1 {
+  font-size: clamp(32px, 4vw, 48px);
+}
+
+.muted,
+.small-note {
+  color: #65705f;
+  line-height: 1.8;
+}
+
+.small-note {
+  font-size: 12px;
+}
+
+.login-form {
+  display: grid;
+  gap: 12px;
+  max-width: 360px;
+  margin: 32px 0 20px;
+}
+
+.login-form input,
+.date-field input {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #bdc5b4;
+  border-radius: 5px;
+  background: #fdfcf8;
+}
+
+.login-form label {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.primary-button,
+.secondary-button,
+.text-button {
+  min-height: 44px;
+  border-radius: 5px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.primary-button,
+.secondary-button {
+  padding: 11px 18px;
+  border: 1px solid #4e6248;
+}
+
+.primary-button {
+  background: #4e6248;
+  color: #fff;
+}
+
+.secondary-button {
+  background: transparent;
+  color: #3b5135;
+}
+
+.text-button {
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  color: #3b5135;
+}
+
+.primary-button:disabled,
+.secondary-button:disabled,
+.text-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.error-message,
+.notice,
+.success-message {
+  padding: 12px 14px;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+.error-message {
+  color: #8a342b;
+  background: #f9ede6;
+}
+
+.notice {
+  color: #6f512e;
+  background: #f2eddf;
+}
+
+.success-message {
+  color: #3e5a35;
+  background: #e9eee1;
+}
+
+.state-message,
+.empty-state {
+  padding: 36px 0;
+  color: #65705f;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.account-bar,
+.section-heading,
+.composer-actions,
+.entry-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.account-bar {
+  padding: 16px 0;
+  font-size: 13px;
+}
+
+.account-bar > span {
+  overflow-wrap: anywhere;
+}
+
+.account-bar button {
+  flex-shrink: 0;
+}
+
+.paper-card {
+  border: 1px solid #dedfd5;
+  border-radius: 7px;
+  background: #fdfcf8;
+}
+
+.composer,
+.entry-card {
+  padding: 28px;
+}
+
+.section-heading .eyebrow {
+  margin-bottom: 8px;
+}
+
+.date-field {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 20px 0;
+  font-size: 13px;
+}
+
+.date-field input {
+  min-width: 155px;
+  max-width: 100%;
+}
+
+.editor-label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.markdown-editor {
+  display: block;
+  width: 100%;
+  min-height: 190px;
+  padding: 14px;
+  border: 1px solid #bdc5b4;
+  border-radius: 4px;
+  background: #fffefb;
+  resize: vertical;
+  line-height: 1.8;
+  font-size: 16px;
+}
+
+.markdown-editor:disabled {
+  background: #f2f2eb;
+}
+
+.composer-actions {
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+.entries-section {
+  margin-top: 40px;
+}
+
+.entries-section > .section-heading {
+  margin-bottom: 20px;
+}
+
+.entry-card {
+  margin-bottom: 20px;
+}
+
+.entry-meta {
+  margin-bottom: 20px;
+  color: #65705f;
+  font-size: 13px;
+}
+
+.markdown-text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.9;
+}
+
+.entry-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.danger-button {
+  color: #8a342b;
+  margin-left: auto;
+}
+
+.revision-history,
+.conflict-panel {
+  border-top: 1px solid #dedfd5;
+  margin-top: 20px;
+  padding-top: 16px;
+}
+
+.revision,
+.conflict-panel .markdown-text {
+  margin: 16px 0;
+  padding: 16px;
+  background: #f1f1e9;
+  border-radius: 4px;
+}
+
+.revision-history h3,
+.conflict-panel h3,
+.empty-state h3 {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.load-more {
+  display: block;
+  margin: 20px auto;
+}
+
 .page-header {
   display: flex;
   align-items: center;
@@ -333,7 +602,7 @@ h2 {
   }
 
   .navigation {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 4px;
     margin-top: 24px;
   }
@@ -385,5 +654,27 @@ h2 {
 
   .page-footer {
     margin-top: 30px;
+  }
+
+  .composer,
+  .entry-card {
+    padding: 20px 16px;
+  }
+
+  .main-content {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .account-bar .small-note {
+    display: block;
+  }
+
+  .login-panel {
+    padding-top: 36px;
+  }
+
+  .entry-actions {
+    gap: 4px;
   }
 }

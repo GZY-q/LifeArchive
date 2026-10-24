@@ -2,7 +2,7 @@ import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { App } from './App';
+import { HealthIndicator } from './components/HealthIndicator';
 
 function stubResponse(body: unknown, status = 200) {
   const fetchMock = vi.fn().mockResolvedValue(
@@ -15,22 +15,12 @@ function stubResponse(body: unknown, status = 200) {
   return fetchMock;
 }
 
-describe('foundation home', () => {
-  it('shows the initial loading state and keeps future navigation disabled', () => {
+describe('health indicator', () => {
+  it('shows the initial loading state', () => {
     vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})));
 
-    render(<App />);
+    render(<HealthIndicator />);
 
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      '把日子，慢慢留下。',
-    );
-    expect(screen.getByRole('link', { name: '首页' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
-    expect(
-      screen.getByRole('button', { name: /日记\s*待开放/ }),
-    ).toBeDisabled();
     expect(screen.getByRole('status')).toHaveTextContent('正在检查连接');
     expect(screen.getByRole('button', { name: '检查连接' })).toBeDisabled();
   });
@@ -38,7 +28,7 @@ describe('foundation home', () => {
   it('checks the same-origin health endpoint and reports a healthy service', async () => {
     const fetchMock = stubResponse({ status: 'ok' });
 
-    render(<App />);
+    render(<HealthIndicator />);
 
     expect(await screen.findByText('服务已连接')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/health', {
@@ -51,7 +41,7 @@ describe('foundation home', () => {
   it('reports HTTP errors even if the body says ok', async () => {
     stubResponse({ status: 'ok' }, 503);
 
-    render(<App />);
+    render(<HealthIndicator />);
 
     expect(await screen.findByText('暂时无法连接服务')).toBeInTheDocument();
   });
@@ -61,7 +51,7 @@ describe('foundation home', () => {
     async (payload) => {
       stubResponse(payload);
 
-      render(<App />);
+      render(<HealthIndicator />);
 
       expect(await screen.findByText('暂时无法连接服务')).toBeInTheDocument();
     },
@@ -73,7 +63,7 @@ describe('foundation home', () => {
       vi.fn().mockResolvedValue(new Response('<html>Unavailable</html>')),
     );
 
-    render(<App />);
+    render(<HealthIndicator />);
 
     expect(await screen.findByText('暂时无法连接服务')).toBeInTheDocument();
   });
@@ -86,7 +76,7 @@ describe('foundation home', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ status: 'ok' })));
     vi.stubGlobal('fetch', fetchMock);
 
-    render(<App />);
+    render(<HealthIndicator />);
 
     expect(await screen.findByText('暂时无法连接服务')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '重新检查连接' }));
@@ -108,7 +98,7 @@ describe('foundation home', () => {
       }),
     );
 
-    render(<App />);
+    render(<HealthIndicator />);
     await act(() => vi.advanceTimersByTimeAsync(8_000));
 
     expect(screen.getByRole('status')).toHaveTextContent('暂时无法连接服务');
