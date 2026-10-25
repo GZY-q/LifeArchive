@@ -13,10 +13,10 @@
 | M2 月历/单日原文 | PR #3，分支 `codex/m2-calendar-days`，待审阅合入 | PR #2 |
 | M2 归档搜索 | [PR #4](https://github.com/GZY-q/LifeArchive/pull/4)，分支 `codex/m2-archive-search`；[实际验收](m2-search-acceptance.md) | PR #3 |
 | M2 往年今日 | [PR #5](https://github.com/GZY-q/LifeArchive/pull/5)，分支 `codex/m2-on-this-day`；[验收](m2-on-this-day-acceptance.md) | PR #4 |
-| 只读日记导出 | 本轮分支 `codex/journal-export`；[验收](journal-export-acceptance.md) | PR #5 |
+| 只读日记导出 | [PR #6](https://github.com/GZY-q/LifeArchive/pull/6)，分支 `codex/journal-export`；[验收](journal-export-acceptance.md) | PR #5 |
 | 06–07 | 仅规划，未实施 | 按下表顺序 |
 
-先审阅 PR #2，再审阅 PR #3，再审阅搜索 PR #4、往年今日 PR #5 和导出 PR；每个依赖合入后重新核对后继 PR 的 base、差异和 CI，避免重复提交前一片内容。合并、重写已推送历史和清理旧数据不属于这份计划的自动动作。未经用户明确授权不自行合并。
+先审阅 PR #2，再审阅 PR #3，再审阅搜索 PR #4、往年今日 PR #5 和导出 PR #6；每个依赖合入后重新核对后继 PR 的 base、差异和 CI，避免重复提交前一片内容。合并、重写已推送历史和清理旧数据不属于这份计划的自动动作。未经用户明确授权不自行合并。
 
 本轮沿用用户连续开发过程中的堆叠 PR 交付：05 的 base 为 `codex/m2-on-this-day`，起点 `97b53106265a4ddf02885c3437a6def773ef44a5`；PR #2–#5 仍待合入。后续优先完成依赖审阅合入；继续堆叠时记录确切 base/head 和依赖，不把未合入内容当成 main 已有能力。工作区有用户修改时先识别并保留，不重置或覆盖。
 

@@ -34,7 +34,13 @@
 
 ## CI
 
-提交后运行 backend、frontend、compose；新增容器内实际 CLI 导出验收，链接和实测结果完成后补记。此处不将本机测试等同于容器验收通过。
+[PR #6](https://github.com/GZY-q/LifeArchive/pull/6) 的实现提交 `8e4c0d182346c3bf64d2f7075a977d9cd22a6d0e` 在 [CI run 40189688949](https://github.com/GZY-q/LifeArchive/actions/runs/40189688949) 完整通过：
+
+- backend：200 项真实 PostgreSQL 测试、4 项环境保护测试及 Ruff 检查通过。
+- frontend：97 项测试、lint、格式、类型、生产构建通过。
+- compose：Docker 镜像构建、Caddy、重复迁移、PG 重启持久化、独立 worker、HTTP 与 Linux Chrome 全部通过。新增镜像内 CLI 验收明确输出 `PASS: installed CLI exports, SHA-256, 0600, deleted policy, overwrite refusal, source unchanged`。
+
+Git 推送凭据缺少 workflow scope，工作流变更通过已连接且有权限的 GitHub 应用发布分支；没有删减验收或更改依赖源。后续证据提交只更新文档和 PR 链接；审阅时同时核对最新 head 的检查状态。
 
 ## 影响与限制
 

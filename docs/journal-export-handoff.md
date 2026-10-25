@@ -1,6 +1,6 @@
 # 只读日记导出交接
 
-范围见 [05 工单](../tasks/05-journal-export.md)、[格式与运行命令](export-format.md)、[验收证据](journal-export-acceptance.md)。本轮从 PR #5 的 `97b53106265a4ddf02885c3437a6def773ef44a5` 新建 `codex/journal-export`，前序 #2–#5 仍待合入，依次审阅并复核后继 PR 的 base/差异/CI，不自动合并。
+范围见 [05 工单](../tasks/05-journal-export.md)、[格式与运行命令](export-format.md)、[验收证据](journal-export-acceptance.md)。本片 [PR #6](https://github.com/GZY-q/LifeArchive/pull/6) 从 PR #5 的 `97b53106265a4ddf02885c3437a6def773ef44a5` 新建 `codex/journal-export`，前序 #2–#5 仍待合入，依次审阅并复核后继 PR 的 base/差异/CI，不自动合并。
 
 ## 实现入口
 
