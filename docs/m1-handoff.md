@@ -82,3 +82,9 @@ M1 当前支持的闭环以 [API contract](api-contract.md) 为准。标签、�
 交给接手模型的提示词：
 
 > 阅读 AGENTS.md、README.md、docs/m1-handoff.md、docs/m1-acceptance.md 和当前明确分配的工单。先确认分支/PR/工作区及上轮验收结果，复用现有 auth、journal、Base、迁移链和 API client。只做分配的切片，保留原始 Markdown/用户日期/修订事务/权限/CSRF/创建幂等，不重搭框架、不顺手升级依赖。新增行为要测试，运行真实 PostgreSQL 验证相关事务；交付代码、测试、文档、运行命令、迁移影响与剩余项。删除或不可逆操作先展示具体方案等待确认。
+
+## 2026-10-26：07 验收准备接续
+
+用户要求使用子智能体继续，已完成只读编辑器审查、37 项相关自动化回归和真实设备协议准备；没有可确认缺陷，不修改原生适配层。完整输入法门槛仍未完成，自动化 CDP composition 和窗口尺寸不能当作系统拼音/软键盘通过。
+
+真实设备矩阵、合成文本、409/401/UUID 手工步骤见 [编辑器兼容协议](editor-compatibility.md)，独立桌面实例与证据状态见 [验收接手](editor-validation-handoff.md)。用户可配合 macOS/Windows；实际结果按逐项操作及证据记录，iOS/Android 尚待安排。不要因准备文档或 CI 绿色宣称整个 M1 验收完成，也不自动替换编辑器或启动后续功能。

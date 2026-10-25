@@ -50,3 +50,9 @@ Compose 实测 PostgreSQL 重启后，owner 会话和已编辑日记的修订/�
 - 升级是添加表，不删除旧数据。回滚 M1 迁移会删除新增表，必须先制定备份/恢复方案并获确认，本轮没有执行回滚或删卷。
 - M1 日记无需 worker / LLM；图片、标签、日历、新闻、AI、导出和备份尚未实现。
 - 本机测试使用 Homebrew 安装 PostgreSQL 17；Homebrew 同时更新了 ca-certificates 并将 openssl 命令链接切换为 OpenSSL 4，OpenSSL 3 的原安装仍保留。没有启用 brew services。
+
+## 2026-10-26：输入法专项准备状态
+
+本节只补充后续 task07 的状态，不改写上面的历史 M1 测试结果。子智能体只读审查未发现可确认缺陷；4 个相关 Vitest 文件 37/37 通过；临时 mocked API 的 Chrome/CDP 组合输入后导航往返保留原文、无写请求。该次为合成事件与引擎验证，不是系统候选窗口或真机软键盘验收。
+
+六行真实设备矩阵仍按 [editor-compatibility.md](editor-compatibility.md) 逐项收集，完整 M1 输入法门槛未完成。当前 Mac 软件盘点、专用合成实例及接续命令见 [验收接手](editor-validation-handoff.md)；没有引入第三方编辑器、依赖、API、迁移或存储变化。
