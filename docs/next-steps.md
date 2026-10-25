@@ -11,7 +11,7 @@
 | M0 基础设施 | 已合入 main | 无 |
 | M1 安全日记核心闭环 | PR #2，分支 `codex/m1-secure-journal`，待审阅合入 | main |
 | M2 月历/单日原文 | PR #3，分支 `codex/m2-calendar-days`，待审阅合入 | PR #2 |
-| M2 归档搜索 | 本轮交付，分支 `codex/m2-archive-search`；实际验收见本轮交接 | PR #3 |
+| M2 归档搜索 | [PR #4](https://github.com/GZY-q/LifeArchive/pull/4)，分支 `codex/m2-archive-search`；[实际验收](m2-search-acceptance.md) | PR #3 |
 | 04–07 | 仅规划，未实施 | 按下表顺序 |
 
 先审阅 PR #2，再审阅 PR #3，最后审阅搜索 PR；每个依赖合入后重新核对后继 PR 的 base、差异和 CI，避免重复提交前一片内容。合并、重写已推送历史和清理旧数据不属于这份计划的自动动作。未经用户明确授权不自行合并。

@@ -25,7 +25,13 @@ HTTP 使用脚本自己的唯一关键词与记录，验证字面匹配/中英�
 
 ## CI
 
-提交后运行仓库现有 backend、frontend、compose 三项 CI，具体链接与实际结果在完成后补记。此处当前不宣称 Docker 构建、PG 重启或 Linux Chrome 已通过本片验证。
+[PR #4](https://github.com/GZY-q/LifeArchive/pull/4) 的实现提交 `c3a44a96fe07a4e2ba7ce9fd1c374e74c8eea8da` 在 [CI run 40148000484](https://github.com/GZY-q/LifeArchive/actions/runs/40148000484) 完整通过：
+
+- backend：151 项真实 PostgreSQL 测试、4 项环境保护测试及 Ruff 检查通过。
+- frontend：72 项测试、lint、格式、类型与生产构建通过。
+- compose：Docker 镜像构建、Caddy 路由、重复迁移、PG 重启迁移持久化、独立 worker 通过。HTTP 验证 PG 重启后会话、当前日记/修订、月历和搜索仍可读取；随后真实 Linux Chrome 完成日记/月历/归档闭环和桌面/手机尺寸布局验证。
+
+后续证据提交只更新验收和 PR 链接，不修改实现或测试。审阅时同时查看 PR 最新提交的检查状态，不以历史绿色运行替代最新状态。
 
 ## 影响与限制
 

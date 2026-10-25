@@ -1,6 +1,6 @@
 # M2 第二片：归档搜索交接
 
-范围见 [03 工单](../tasks/03-archive-search.md)，验证见 [验收记录](m2-search-acceptance.md)，后续执行顺序见 [下一步计划](next-steps.md)。本片建立在 M1 与月历分片上；PR #2、#3 尚未合并时，本片 PR 以 `codex/m2-calendar-days` 为基线。先处理前序 PR，再复核差异并调整基线；不要重复合入同一批功能。
+范围见 [03 工单](../tasks/03-archive-search.md)，验证见 [验收记录](m2-search-acceptance.md)，后续执行顺序见 [下一步计划](next-steps.md)。本片 [PR #4](https://github.com/GZY-q/LifeArchive/pull/4) 建立在 M1 与月历分片上；PR #2、#3 尚未合并时，本片 PR 以 `codex/m2-calendar-days` 为基线。先处理前序 PR，再复核差异并调整基线；不要重复合入同一批功能。
 
 ## 模块与约定
 
