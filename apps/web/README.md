@@ -1,6 +1,6 @@
-# LifeArchive Web · M2 归档搜索
+# LifeArchive Web · M2 往年今日
 
-实现 owner 登录、日记录入/列表/编辑/删除确认、版本比对和修订历史，以及月历计数、日期详情和归档搜索。切换日历/归档时保留日记组件与内存草稿；会话失效时移除所有视图的私密 DOM，重新登录可继续同页草稿。完整部署和边界见根 README 与 `docs/m2-search-handoff.md`。
+实现 owner 登录、日记录入/列表/编辑/删除确认、版本比对和修订历史，以及月历计数、日期详情、归档搜索和往年今日。切换日历/归档时保留日记组件与内存草稿；会话失效时移除所有视图的私密 DOM，重新登录可继续同页草稿。完整部署和边界见根 README 与 `docs/m2-on-this-day-handoff.md`。
 
 ## 本地开发
 
@@ -43,7 +43,7 @@ npm run build
 | `src/auth/`                          | 登录边界、认证内导航、重新验证和显式退出          |
 | `src/api/`                           | typed 同源客户端、响应校验、15 秒超时、CSRF       |
 | `src/journal/`                       | 日期、创建重试 UUID、列表、409 草稿比对与修订历史 |
-| `src/calendar/`                      | 公历日期运算、月历和分页日期详情                  |
+| `src/calendar/`                      | 公历日期运算、月历、分页日期详情与往年今日        |
 | `src/search/`                        | 搜索表单、已提交条件快照、分页/重试与竞态取消     |
 | `src/components/MarkdownEditor.tsx`  | 受控原文适配、IME composition 状态                |
 | `src/api/health.ts`                  | 同源健康请求及响应校验                            |
@@ -58,11 +58,13 @@ npm run build
 
 归档只在明确提交后读取；关键词、日期与游标只放 POST 请求体。输入变化不修改已有结果对应的已提交条件，翻页/重试沿用该快照。离开归档会取消请求并卸载结果，返回保留内存表单，需再次提交。显式退出清空表单，不使用 URL 或浏览器持久存储；原文按纯文本显示。测试覆盖这套状态边界、请求竞态、CSRF、401 和草稿保护。
 
+往年今日由 `src/calendar/OnThisDay.tsx` 实现：初始收起，展开才读取；折叠/离开卸载结果并取消请求。选择日期和刷新日历时保持展开意图，以日期/刷新 key 重挂载结果，清掉旧游标；所有请求显式传参考日期。结果校验过去年份和相同月日，完整年份与原文按纯文本显示。测试覆盖首屏/分页竞态、错误重试、401、显式退出与草稿。
+
 M1 未引入 `@usememos/editor`。已核验其正式 `26.10.25` 包存在、MIT、React peer >=18；上游仍要求真实系统 IME / 移动软键盘矩阵，因此本轮使用独立 textarea 适配层。详见 [编辑器选择记录](../../docs/m1-handoff.md)。不要将 Chrome 模拟的 composition 事件声称为全部真实键盘通过。
 
 ## 依赖依据
 
-沿用 M0 已锁定的 React/Vite 依赖，M1 和 M2 两片均不额外升级前端依赖。TypeScript 固定 6.0.3，满足 `typescript-eslint` 的 `<6.1` peer 约束；布局使用普通 CSS。依赖与设计参考：
+沿用 M0 已锁定的 React/Vite 依赖，M1 和 M2 三片均不额外升级前端依赖。TypeScript 固定 6.0.3，满足 `typescript-eslint` 的 `<6.1` peer 约束；布局使用普通 CSS。依赖与设计参考：
 
 - [Vite 环境要求](https://vite.dev/guide/)
 - [Vite 开发代理](https://vite.dev/config/server-options#server-proxy)

@@ -12,6 +12,7 @@ import {
   parseCalendarDate,
 } from './dates';
 import { DayEntries } from './DayEntries';
+import { OnThisDay } from './OnThisDay';
 
 type Props = {
   date: string;
@@ -185,6 +186,12 @@ export function CalendarWorkspace({
       <DayEntries
         key={`${date}:${refresh}`}
         date={date}
+        disabled={disabled}
+        onExpired={onExpired}
+      />
+      <OnThisDay
+        date={date}
+        refresh={refresh}
         disabled={disabled}
         onExpired={onExpired}
       />

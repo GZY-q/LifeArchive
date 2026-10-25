@@ -77,3 +77,43 @@ export async function getDay(
   if (items.some((item) => item.entry_date !== date)) return invalidResponse();
   return { date, entries: { items, next_cursor: value.entries.next_cursor } };
 }
+
+export async function getOnThisDay(
+  date: string,
+  cursor?: string,
+  signal?: AbortSignal,
+): Promise<DayEntries> {
+  const reference = parseCalendarDate(date);
+  if (!reference) return invalidResponse();
+  // Explicitly keep the selected date on every page, including across midnight.
+  const query = new URLSearchParams({ date, limit: '20' });
+  if (cursor) query.set('cursor', cursor);
+  const value = await request(`/on-this-day?${query}`, { signal });
+  if (
+    !isRecord(value) ||
+    value.date !== date ||
+    !isRecord(value.entries) ||
+    !Array.isArray(value.entries.items) ||
+    !(
+      value.entries.next_cursor === null ||
+      (typeof value.entries.next_cursor === 'string' &&
+        value.entries.next_cursor.length > 0 &&
+        value.entries.next_cursor.length <= 2048)
+    )
+  )
+    return invalidResponse();
+  const items = value.entries.items.map(entryFrom);
+  if (
+    items.some((item) => {
+      const day = parseCalendarDate(item.entry_date);
+      return (
+        !day ||
+        day.year >= reference.year ||
+        day.month !== reference.month ||
+        day.day !== reference.day
+      );
+    })
+  )
+    return invalidResponse();
+  return { date, entries: { items, next_cursor: value.entries.next_cursor } };
+}

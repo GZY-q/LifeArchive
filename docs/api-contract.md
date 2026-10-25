@@ -1,6 +1,6 @@
 # API contract — /api/v1
 
-M1 已实现 health、owner 会话和最小日记闭环；M2 已分片扩展月历、日记日期详情和基础归档搜索。下方 V1 全量资源表仍包含未来草案，未列入已实现章节的资源尚未实现。
+M1 已实现 health、owner 会话和最小日记闭环；M2 已分片扩展月历、日记日期详情、基础归档搜索和往年今日。下方 V1 全量资源表仍包含未来草案，未列入已实现章节的资源尚未实现。
 
 ## M1 已实现
 
@@ -32,6 +32,13 @@ M1 已实现 health、owner 会话和最小日记闭环；M2 已分片扩展月�
 - 要求有效会话、可信 Origin 与 `X-CSRF-Token`，所有响应 no-store。关键词和游标放请求体，不进 URL 或浏览器持久存储。此只读 POST 替代原先未实现的 GET 搜索草案，避免私密搜索词进入普通访问日志。
 - 不写日记、修订或搜索历史，不提供全文分词、相关性排序或语义检索。当前 PostgreSQL 字面子串查询没有大数据量索引性能保证。
 
+## M2 第三片：往年今日
+
+- `GET /on-this-day?date=YYYY-MM-DD&limit=20&cursor=...`：返回 `{date,entries:{items,next_cursor}}`，条目复用 EntryResponse。date 可省略，按当前 UTC instant 转 owner IANA 时区取本地日期，并在响应中返回；前端及后续分页显式传该日期，避免跨午夜改变条件。
+- 日期严格为 `YYYY-MM-DD`，年份 1–9999；limit 1–100，默认 20；cursor 非空且最多 2048 字符。只读 owner 未删除的当前日记，`entry_date` 年份必须小于参考年份，月日完全相同；参考年 1 返回空结果。2 月 29 日只匹配以往真正的闰日，不映射到 2 月 28 日或 3 月 1 日。
+- 按 `(entry_date DESC,created_at DESC,id DESC)` keyset 分页。独立 `on-this-day-v1` 游标绑定 owner 和完整参考日期；非法、跨 owner/日期/接口游标均通用 422。修改原文/日期或软删除后的重新读取反映当前数据，不查询历史修订，不承诺跨请求快照。
+- 有效会话必需，未登录 401，响应 no-store；没有写入、派生表、调度、提醒或新闻/AI 字段。前端仅展开时查询，收起/离开取消；更换日期及刷新日历重读已展开区域。
+
 ## V1 全量资源规划
 
 This is the intended resource boundary, **not implemented endpoints**. Responses must be Pydantic typed, errors consistent, pagination stable, and permission checks applied at every record read and mutation.
@@ -48,6 +55,7 @@ This is the intended resource boundary, **not implemented endpoints**. Responses
 | POST / GET | `/assets` / `/assets/{id}` | upload, authorized read |
 | GET | `/calendar?year=&month=` | counts by day |
 | GET | `/days/{YYYY-MM-DD}` | journal + digest + events by day |
+| GET | `/on-this-day?date=` | past years on the exact calendar anniversary |
 | GET | `/news/events` | searchable events |
 | GET | `/news/digests/{YYYY-MM-DD}` | daily digest and citations |
 | GET / POST / PATCH / DELETE | `/interests` | interest preferences |

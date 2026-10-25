@@ -1,8 +1,10 @@
 from datetime import date as CalendarDate
+from typing import Literal
+from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
-from life_archive.journal.schemas import EntryPage
+from life_archive.journal.schemas import ArchiveDate, EntryPage
 
 
 class CalendarDay(BaseModel):
@@ -19,3 +21,14 @@ class CalendarResponse(BaseModel):
 class DayResponse(BaseModel):
     date: CalendarDate
     entries: EntryPage
+
+
+class OnThisDayCursor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: Literal["on-this-day-v1"]
+    user_id: UUID
+    reference_date: ArchiveDate
+    entry_date: ArchiveDate
+    created_at: AwareDatetime
+    id: UUID
