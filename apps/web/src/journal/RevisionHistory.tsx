@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { errorMessage, isUnauthorized } from '../api/client';
 import { listRevisions } from '../api/journal';
 import type { EntryRevision } from '../api/journal';
+import { TagBadges } from './TagBadges';
 
 export function RevisionHistory({
   entryId,
@@ -67,6 +68,7 @@ export function RevisionHistory({
             版本 {revision.revision} · 日记日期 {revision.entry_date}
           </p>
           <pre className="markdown-text">{revision.content_md}</pre>
+          <TagBadges tags={revision.tags} />
         </article>
       ))}
       {busy && <p role="status">正在读取历史…</p>}

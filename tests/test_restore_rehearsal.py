@@ -346,8 +346,8 @@ class PortableComparisonTests(unittest.TestCase):
         path = self.root / name
         member = "entries/00000000-0000-0000-0000-000000000001.md"
         manifest = {
-            "schema_version": 1,
-            "alembic_revision": "0003_journal",
+            "schema_version": 2,
+            "alembic_revision": "0004_entry_tags",
             "owner": {"id": "owner"},
             "deleted_policy": "include_deleted",
             "entry_count": 1,
@@ -358,11 +358,17 @@ class PortableComparisonTests(unittest.TestCase):
                     "path": member,
                     "bytes": len(content),
                     "sha256": ("0" * 64 if bad_hash else hashlib.sha256(content).hexdigest()),
-                }
+                },
+                {
+                    "path": "tags.json",
+                    "bytes": 3,
+                    "sha256": hashlib.sha256(b"[]\n").hexdigest(),
+                },
             ],
         }
         with ZipFile(path, "w") as archive:
             archive.writestr(member, content)
+            archive.writestr("tags.json", b"[]\n")
             archive.writestr("manifest.json", json.dumps(manifest))
         return path
 
@@ -370,23 +376,23 @@ class PortableComparisonTests(unittest.TestCase):
         a = self.archive("a.zip")
         b = self.archive("b.zip", exported_at="2026-10-25T00:01:00+00:00")
         self.assertEqual(
-            checks.compare_exports(a, b, "0003_journal"),
+            checks.compare_exports(a, b, "0004_entry_tags"),
             {
                 "entries": 1,
                 "revisions": 0,
-                "files": 1,
+                "files": 2,
             },
         )
         changed = self.archive("changed.zip", content=b"changed")
         with self.assertRaises(support.RestoreError):
-            checks.compare_exports(a, changed, "0003_journal")
+            checks.compare_exports(a, changed, "0004_entry_tags")
         with self.assertRaises(support.RestoreError):
             checks.compare_exports(a, b, "other_head")
 
     def test_corrupt_export_hash_is_rejected(self):
         a, b = self.archive("a.zip"), self.archive("bad.zip", bad_hash=True)
         with self.assertRaises(support.RestoreError):
-            checks.compare_exports(a, b, "0003_journal")
+            checks.compare_exports(a, b, "0004_entry_tags")
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import type { Entry } from '../api/journal';
 import { RevisionHistory } from './RevisionHistory';
+import { TagBadges } from './TagBadges';
 
 export function EntryCard({
   entry,
@@ -27,6 +28,7 @@ export function EntryCard({
         <span className="small-note">版本 {entry.revision}</span>
       </div>
       <pre className="markdown-text">{entry.content_md}</pre>
+      <TagBadges tags={entry.tags} />
       <div className="entry-actions">
         <button
           type="button"

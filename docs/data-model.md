@@ -7,11 +7,14 @@ Schema is a **design draft**, not an applied migration. Codex should implement t
 - `users(id, username, password_hash, timezone, created_at, ...)`
 - `sessions` or a robust secure-session equivalent; do not store plain tokens.
 - `entries(id, user_id, content_md, entry_date DATE, occurred_at TIMESTAMPTZ NULL, occurred_timezone TEXT NULL, created_at TIMESTAMPTZ, updated_at TIMESTAMPTZ, deleted_at TIMESTAMPTZ NULL, revision INT, client_request_id UUID NULL)`
-- `entry_revisions(id, entry_id, revision, content_md, entry_date, changed_at, editor_id)`
-- `tags`, `entry_tags`
+- `entry_revisions(id, entry_id, revision, content_md, entry_date, changed_at, editor_id, tags JSONB)`
+- `tags(id, user_id, name, name_key, created_at)`; unique `(user_id,name_key)`.
+- `entry_tags(entry_id, tag_id, user_id)`; primary key `(entry_id,tag_id)` and composite owner foreign keys to entries/tags.
 - `assets(id, owner_id, sha256, mime_type, byte_size, storage_key, created_at)`, `entry_assets`.
 
 `entries.entry_date` is a calendar label chosen by user, not always the UTC date of `created_at`. Unique `(user_id, client_request_id)` where client id is non-null; real FK and indexes should be used. Revision must increment with optimistic version checks. Soft delete and permanent purge require explicit semantics for revisions, assets and indexes.
+
+Task 08 applies tags with `0004_entry_tags`. Names use trimmed NFC for display and NFKC + casefold for owner-scoped uniqueness. An entry has at most 20 tags. Tags and journal fields share one revision/CAS transaction; immutable revision `tags` stores UUID/name snapshots, sorted by UUID. Existing revisions receive `[]`. Tag IDs do not alter raw Markdown. Creation replay compares revision 1's tag-ID set alongside the original text/date. Tag rename/delete and tag hierarchies remain deferred.
 
 ## News
 

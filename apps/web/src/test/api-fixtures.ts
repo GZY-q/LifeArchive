@@ -15,6 +15,7 @@ export const sampleEntry: Entry = {
   revision: 1,
   created_at: '2026-10-02T03:00:00Z',
   updated_at: '2026-10-02T03:00:00Z',
+  tags: [],
 };
 
 export function json(value: unknown, status = 200): Response {
@@ -41,6 +42,8 @@ export function mockApi(
       return json(session);
     if (path.startsWith('/api/v1/entries?'))
       return json({ items: entries, next_cursor: null });
+    if (path.startsWith('/api/v1/tags?'))
+      return json({ items: [], next_cursor: null });
     throw new Error(
       `Unexpected test request: ${options.method ?? 'GET'} ${path}`,
     );

@@ -18,6 +18,99 @@ import {
 } from '../test/api-fixtures';
 
 describe('journal workflow', () => {
+  it('creates and selects a tag, then freezes its IDs with an uncertain journal save', async () => {
+    const tag = {
+      id: '51f151a5-ed01-4e56-982d-4f4a6d98f5a8',
+      name: '生活',
+      created_at: sampleEntry.created_at,
+    };
+    const posts: Record<string, unknown>[] = [];
+    mockApi((path, options) => {
+      if (path === '/api/v1/tags' && options.method === 'POST') {
+        expect(requestBody(options)).toEqual({ name: '生活' });
+        expect(options.headers).toMatchObject({
+          'X-CSRF-Token': session.csrf_token,
+        });
+        return json(tag, 201);
+      }
+      if (path === '/api/v1/entries' && options.method === 'POST') {
+        posts.push(requestBody(options));
+        return posts.length === 1
+          ? Promise.reject(new TypeError('response lost'))
+          : json({ ...sampleEntry, tags: [tag] });
+      }
+      return undefined;
+    });
+    render(<App />);
+    fireEvent.change(await screen.findByLabelText('日记内容'), {
+      target: { value: '今天散步' },
+    });
+    fireEvent.change(screen.getByLabelText('新标签名称'), {
+      target: { value: '生活' },
+    });
+    await userEvent.click(
+      screen.getByRole('button', { name: '创建并选择标签' }),
+    );
+    const choice = await screen.findByRole('checkbox', { name: '生活' });
+    expect(choice).toBeChecked();
+    await userEvent.click(screen.getByRole('button', { name: '保存日记' }));
+    await screen.findByRole('button', { name: '重试保存' });
+    expect(choice).toBeDisabled();
+    expect(screen.getByLabelText('新标签名称')).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: '重试保存' }));
+    await screen.findByText('日记已保存。');
+    expect(posts[0].tag_ids).toEqual([tag.id]);
+    expect(posts[1]).toEqual(posts[0]);
+  });
+
+  it('changes the tag filter without losing the draft or accepting a stale page', async () => {
+    const tag = {
+      id: '51f151a5-ed01-4e56-982d-4f4a6d98f5a8',
+      name: '生活',
+      created_at: sampleEntry.created_at,
+    };
+    let resolvePage!: (response: Response) => void;
+    mockApi((path) => {
+      if (path.startsWith('/api/v1/tags?'))
+        return json({ items: [tag], next_cursor: null });
+      if (path.includes('cursor=old-page'))
+        return new Promise<Response>((resolve) => {
+          resolvePage = resolve;
+        });
+      if (path.includes(`tag_id=${tag.id}`))
+        return json({
+          items: [{ ...sampleEntry, content_md: '标签内的记录', tags: [tag] }],
+          next_cursor: null,
+        });
+      if (path.startsWith('/api/v1/entries?'))
+        return json({ items: [sampleEntry], next_cursor: 'old-page' });
+      return undefined;
+    });
+    render(<App />);
+    const editor = await screen.findByLabelText('日记内容');
+    fireEvent.change(editor, { target: { value: '尚未保存的草稿' } });
+    await userEvent.click(
+      await screen.findByRole('checkbox', { name: '生活' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: '加载更多日记' }),
+    );
+    await userEvent.selectOptions(screen.getByLabelText('按标签筛选'), tag.id);
+    await screen.findByText('标签内的记录');
+    resolvePage(
+      json({
+        items: [{ ...sampleEntry, id: 'stale', content_md: '旧分页不得回来' }],
+        next_cursor: null,
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText('日记内容')).toHaveValue('尚未保存的草稿'),
+    );
+    expect(editor).toBe(screen.getByLabelText('日记内容'));
+    expect(screen.getByRole('checkbox', { name: '生活' })).toBeChecked();
+    expect(screen.queryByText('旧分页不得回来')).not.toBeInTheDocument();
+  });
+
   it('round-trips Chinese raw Markdown and a backdated date without submitting composition Enter', async () => {
     let stored: Record<string, unknown> | null = null;
     mockApi((path, options) => {
@@ -250,6 +343,7 @@ describe('journal workflow', () => {
                 entry_date: sampleEntry.entry_date,
                 changed_at: sampleEntry.updated_at,
                 editor_id: session.user.id,
+                tags: [],
               },
             ],
             next_cursor: more ? null : 2,
