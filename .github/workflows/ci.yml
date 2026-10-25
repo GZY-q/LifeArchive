@@ -58,7 +58,7 @@ jobs:
       - run: uv run --locked ruff check ../../scripts ../../tests
       - run: uv run --locked ruff format --check ../../scripts ../../tests
       - run: uv run --locked pytest
-      - name: Check environment initializer
+      - name: Check environment and restore guards
         working-directory: .
         run: python3 -m unittest discover -s tests -v
       - name: Stop isolated test PostgreSQL
@@ -141,3 +141,36 @@ jobs:
       - name: Stop the isolated stack (preserve volumes)
         if: always()
         run: docker compose --profile worker down --remove-orphans
+
+  restore:
+    needs: [backend, frontend]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Restore synthetic data into a new isolated target
+        run: |
+          python3 scripts/smoke-restore.py \
+            --artifact-dir "$RUNNER_TEMP/life-archive-restore-positive" \
+            --source-port 18082 --target-port 18083
+      - name: Reject a damaged archive without starting the target application
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess, sys
+          from pathlib import Path
+          directory = Path(os.environ['RUNNER_TEMP']) / 'life-archive-restore-negative'
+          result = subprocess.run([
+              sys.executable, 'scripts/smoke-restore.py', '--artifact-dir', str(directory),
+              '--source-port', '18084', '--target-port', '18085', '--corrupt-test-dump',
+          ], check=False)
+          assert result.returncode == 1, 'Damaged dump did not fail as expected'
+          report = json.loads((directory / 'report.json').read_text())
+          assert report['status'] == 'failed' and not report['target_app_started']
+          assert report['last_phase'] == 'restore database'
+          for check in ('corrupt_dump_refused', 'target_still_empty', 'source_unchanged',
+                        'owned_projects_stopped'):
+              assert report['checks'][check], check
+          print('PASS: damaged archive refused; target empty, source unchanged, projects stopped')
+          PY

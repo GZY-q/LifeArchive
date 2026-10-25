@@ -11,8 +11,9 @@ LifeArchive 是一个独立实现、单用户优先、自托管、面向几十�
 - M2 第二片提供归档搜索：中文/英文连续原文、日记日期范围和分页；手动提交，搜索词只放请求体。当前采用字面子串匹配，尚未验证大规模全文索引性能。
 - M2 第三片提供“往年这一天”：在日历选择日期并展开，分页查看以前年份同月同日的原文；闰日严格匹配，切换日期或刷新重新读取。
 - 提供只读日记导出 CLI：原始 Markdown、JSON 元数据、所选日记全部修订与 SHA-256 清单；可显式包含软删除记录，拒绝覆盖已有目标。
+- 提供隔离恢复演练脚本：新建合成源和空目标，验证 PG dump/restore、原文/修订/导出一致性和重启后读取；完整自动化加密备份仍待后续。
 - 编辑器通过独立适配层使用原生 Markdown 文本域；第三方编辑器的中文 IME / 移动端兼容验证仍需补齐。媒体、标签、新闻、AI 与完整备份恢复尚未实现。
-- 最新运行与限制见 [日记导出交接](docs/journal-export-handoff.md) 和 [验收记录](docs/journal-export-acceptance.md)；下一步按 [实施与接手计划](docs/next-steps.md) 逐片推进。月历见 [M2 第一片](docs/m2-handoff.md)；认证和日记约定见 [M1 交接](docs/m1-handoff.md)。历史检查保留在 [M1](docs/m1-acceptance.md) / [M0](docs/m0-acceptance.md) 验收记录。
+- 最新运行与限制见 [恢复演练交接](docs/restore-rehearsal.md) 和 [验收记录](docs/restore-acceptance.md)；下一步按 [实施与接手计划](docs/next-steps.md) 逐片推进。月历见 [M2 第一片](docs/m2-handoff.md)；认证和日记约定见 [M1 交接](docs/m1-handoff.md)。历史检查保留在 [M1](docs/m1-acceptance.md) / [M0](docs/m0-acceptance.md) 验收记录。
 - 所有设计取舍以 `docs/architecture.md`、`docs/product.md` 和 `docs/data-model.md` 为准。发生冲突时，先在 PR 中指出差异，不要静默改动核心约束。
 
 ## 目标
@@ -156,6 +157,16 @@ unset COMPOSE_PROJECT_NAME WEB_PORT
 
 `scripts/smoke-journal.py` 与 `scripts/smoke-browser.mjs` 会写入并软删除隔离测试日记，需要明确的测试项目名和临时 owner 密码，完整执行顺序见 [往年今日交接](docs/m2-on-this-day-handoff.md)。CI 自动执行 HTTP、PostgreSQL 重启持久化、真实 Chrome 录入/冲突/修订/退出，以及月历计数、日期详情、归档搜索、往年今日、私密查询传输与跨视图草稿保留检查。随后在 API 镜像内执行实际导出 CLI，核验哈希、权限、删除策略和源数据未变。
 
+### 隔离恢复演练
+
+需要可用 Docker Engine / Compose，从根目录运行：
+
+```bash
+python3 scripts/smoke-restore.py --artifact-dir /absolute/private-parent/new-restore-report --source-port 18082 --target-port 18083
+```
+
+工件路径必须全新且为绝对路径，父目录已存在。脚本专用 env、项目和数据卷，与已有 `.env` 及实例隔离；只恢复到自己新建并核实为空的目标，不接受任意 URL/项目/dump。完成后只停止自有容器，保留数据卷和 0600 私密工件，清理需单独确认。正常恢复与损坏备份拒绝均由独立 Docker CI 验证。精确边界、运行/失败说明和交接见 [恢复演练](docs/restore-rehearsal.md)。
+
 ## 代码目录
 
 ```text
@@ -163,7 +174,7 @@ apps/web/         React 登录、日记、月历/往年今日、搜索、编辑�
 apps/server/      FastAPI 认证/日记/日期聚合、只读导出 CLI、SQLAlchemy、Alembic、worker 与测试
 infra/Caddyfile   静态 SPA 与 /api 代理
 compose.yaml      web / api / postgres；worker 为可选 profile
-scripts/          安全环境初始化、隔离 Compose / HTTP / Chrome / 导出验收
+scripts/          安全环境初始化、隔离 Compose / HTTP / Chrome / 导出 / 恢复验收
 tests/            环境初始化的标准库测试
 .github/workflows/ci.yml
 docs/             产品/架构设计、各任务验收与后续交接
@@ -185,7 +196,8 @@ tasks/            严格按顺序执行的里程碑工单
 - `tasks/03-archive-search.md` — M2 第二片：私密归档搜索
 - `tasks/04-on-this-day.md` — M2 第三片：往年今日
 - `tasks/05-journal-export.md` — 只读日记导出
-- `docs/next-steps.md` — 依赖顺序、06–07 待分配工单与接手提示词
+- `tasks/06-restore-rehearsal.md` — 隔离 PostgreSQL 恢复演练
+- `docs/next-steps.md` — 依赖顺序、07 待分配工单与接手提示词
 - `docs/decisions.md` — 核心技术决策
 - `docs/m0-handoff.md` — M0 实现边界、代码入口和 M1 交接
 - `docs/m0-acceptance.md` — 可复核的检查结果与运行限制
@@ -201,6 +213,9 @@ tasks/            严格按顺序执行的里程碑工单
 - `docs/export-format.md` — 可移植格式 v1、运行与独立哈希核验
 - `docs/journal-export-handoff.md` — 导出实现入口、错误边界和后续交接
 - `docs/journal-export-acceptance.md` — 导出实际验收证据
+
+- `docs/restore-rehearsal.md` — 恢复演练边界、运行和交接
+- `docs/restore-acceptance.md` — 本机与真实 Docker 验收证据
 
 ## 免责声明
 
