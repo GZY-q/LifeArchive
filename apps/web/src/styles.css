@@ -600,6 +600,62 @@ textarea:focus-visible {
   margin-top: 0;
 }
 
+.archive-panel {
+  padding: 28px;
+}
+
+.archive-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+  font-size: 13px;
+}
+
+.archive-form input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #bdc5b4;
+  border-radius: 5px;
+  background: #fffefb;
+}
+
+.archive-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 4px 0;
+}
+
+.archive-dates label {
+  display: grid;
+  flex: 1 1 160px;
+  min-width: 0;
+  gap: 8px;
+}
+
+.archive-form > button {
+  justify-self: start;
+}
+
+.archive-results {
+  margin-top: 32px;
+}
+
+.archive-summary {
+  overflow-wrap: anywhere;
+}
+
+.archive-entry {
+  margin-top: 16px;
+  padding: 24px;
+}
+
+.archive-entry > .small-note {
+  margin-top: 0;
+}
+
 .page-header {
   display: flex;
   align-items: center;
@@ -814,7 +870,9 @@ h2 {
   }
 
   .calendar-panel,
-  .day-entry {
+  .day-entry,
+  .archive-panel,
+  .archive-entry {
     padding: 20px 14px;
   }
 

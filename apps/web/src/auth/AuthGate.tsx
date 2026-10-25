@@ -7,6 +7,8 @@ import { emptyDraft, hasUnsavedDraft, todayIn } from '../journal/draft';
 import type { Draft } from '../journal/draft';
 import { JournalWorkspace } from '../journal/JournalWorkspace';
 import { CalendarWorkspace } from '../calendar/CalendarWorkspace';
+import { ArchiveWorkspace } from '../search/ArchiveWorkspace';
+import { emptySearchForm } from '../search/form';
 import { LoginForm } from './LoginForm';
 
 export function AuthGate() {
@@ -19,8 +21,11 @@ export function AuthGate() {
   const [signingOut, setSigningOut] = useState(false);
   const [writeBusy, setWriteBusy] = useState(false);
   const [revalidating, setRevalidating] = useState(false);
-  const [view, setView] = useState<'journal' | 'calendar'>('journal');
+  const [view, setView] = useState<'journal' | 'calendar' | 'archive'>(
+    'journal',
+  );
   const [calendarDate, setCalendarDate] = useState<string | null>(null);
+  const [searchForm, setSearchForm] = useState(emptySearchForm);
   const ownerId = useRef<string | null>(null);
 
   useEffect(() => {
@@ -56,6 +61,7 @@ export function AuthGate() {
     if (ownerId.current !== current.user.id || !draft) {
       setDraft(emptyDraft(current.user.timezone));
       setCalendarDate(null);
+      setSearchForm(emptySearchForm);
       setView('journal');
     }
     ownerId.current = current.user.id;
@@ -110,6 +116,7 @@ export function AuthGate() {
     ownerId.current = null;
     setExpired(false);
     setCalendarDate(null);
+    setSearchForm(emptySearchForm);
     setView('journal');
   }
 
@@ -202,8 +209,14 @@ export function AuthGate() {
         >
           日历
         </button>
-        <button type="button" className="nav-item" disabled>
-          归档 <span className="nav-soon">待开放</span>
+        <button
+          type="button"
+          className={`nav-item ${view === 'archive' ? 'selected' : ''}`}
+          aria-current={view === 'archive' ? 'page' : undefined}
+          disabled={signingOut || revalidating || writeBusy}
+          onClick={() => setView('archive')}
+        >
+          归档
         </button>
       </nav>
       {draft && (
@@ -223,6 +236,15 @@ export function AuthGate() {
           date={calendarDate ?? todayIn(session.user.timezone)}
           timezone={session.user.timezone}
           onDate={setCalendarDate}
+          onExpired={expire}
+          disabled={signingOut || revalidating}
+        />
+      )}
+      {view === 'archive' && (
+        <ArchiveWorkspace
+          form={searchForm}
+          onForm={setSearchForm}
+          csrfToken={session.csrf_token}
           onExpired={expire}
           disabled={signingOut || revalidating}
         />

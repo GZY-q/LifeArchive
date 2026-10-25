@@ -85,6 +85,8 @@ try {
   let nextId = 0;
   let allowDialog = false;
   let unexpectedDialog = false;
+  let searchRequests = 0;
+  let unsafeSearchTransport = false;
   const pending = new Map();
   function send(method, params = {}, sessionId) {
     return new Promise((resolve, reject) => {
@@ -99,6 +101,15 @@ try {
   }
   socket.addEventListener('message', ({ data }) => {
     const message = JSON.parse(data);
+    if (message.method === 'Network.requestWillBeSent') {
+      const request = message.params.request;
+      const url = new URL(request.url);
+      if (url.pathname === '/api/v1/search') {
+        searchRequests += 1;
+        if (request.method !== 'POST' || url.search)
+          unsafeSearchTransport = true;
+      }
+    }
     const item = pending.get(message.id);
     if (item) {
       clearTimeout(item.timer);
@@ -161,8 +172,26 @@ try {
       `Boolean(document.querySelector('section[aria-label="${date} 的日记"]'))`,
     );
   }
+  async function setDateInput(selector, value) {
+    await evaluate(
+      `(() => { const input = document.querySelector(${JSON.stringify(selector)}); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(value)}); input.dispatchEvent(new Event('input', { bubbles: true })); })()`,
+    );
+  }
+  async function searchArchive() {
+    await wait(
+      'document.querySelector("#archive-query")?.getClientRects().length > 0',
+    );
+    await wait(
+      '[...document.querySelectorAll("button")].some(item => item.textContent.trim() === "搜索日记" && !item.disabled)',
+    );
+    await type('#archive-query', '中文输入');
+    await setDateInput('#archive-date-from', '2001-02-03');
+    await setDateInput('#archive-date-to', '2001-02-03');
+    await click('搜索日记');
+  }
   const api = (expression) => evaluate(`(async () => { ${expression} })()`);
   await cdp('Page.enable');
+  await cdp('Network.enable');
   await cdp('Emulation.setDeviceMetricsOverride', {
     width: 1440,
     height: 1000,
@@ -213,6 +242,19 @@ try {
       '2001-02-03'
   )
     throw new Error('Calendar navigation lost unsaved Markdown or date');
+  await click('归档');
+  await wait('Boolean(document.querySelector("#archive-query"))');
+  await type('#archive-query', '尚未保存的日记');
+  await click('搜索日记');
+  await wait('document.body.textContent.includes("没有找到符合条件的日记")');
+  await click('日记');
+  if (
+    (await evaluate('document.querySelector("#journal-content").value')) !==
+      original ||
+    (await evaluate('document.querySelector("#entry-date").value')) !==
+      '2001-02-03'
+  )
+    throw new Error('Archive navigation lost unsaved Markdown or date');
   await click('保存日记');
   await wait('Boolean(document.querySelector("article.entry-card"))');
   const first = await api(
@@ -283,6 +325,36 @@ try {
   console.log(
     'PASS: calendar preserves draft, counts backdated journal, reads raw day Markdown and handles empty days',
   );
+  await click('归档');
+  await searchArchive();
+  await wait(
+    `document.querySelector('article.archive-entry pre')?.textContent === ${JSON.stringify(draft)}`,
+  );
+  const submittedRequests = searchRequests;
+  await type('#archive-query', '没有这段文字');
+  if (
+    (await evaluate(
+      'document.querySelector("article.archive-entry pre")?.textContent',
+    )) !== draft ||
+    searchRequests !== submittedRequests
+  )
+    throw new Error(
+      'Editing search inputs changed submitted results or sent a request',
+    );
+  await click('搜索日记');
+  await wait('document.body.textContent.includes("没有找到符合条件的日记")');
+  await searchArchive();
+  await wait(
+    `document.querySelector('article.archive-entry pre')?.textContent === ${JSON.stringify(draft)}`,
+  );
+  if (
+    unsafeSearchTransport ||
+    (await evaluate('Boolean(location.search) || window.__unsafe === true'))
+  )
+    throw new Error('Search exposed a query in the URL or executed Markdown');
+  console.log(
+    'PASS: private body-only search, Chinese/date filters, submitted filter snapshot and raw Markdown',
+  );
   for (const [name, width, height, mobile] of [
     ['desktop', 1440, 1000, false],
     ['mobile', 390, 844, true],
@@ -293,8 +365,14 @@ try {
       deviceScaleFactor: 1,
       mobile,
     });
-    for (const view of ['日历', '日记']) {
+    for (const view of ['日历', '归档', '日记']) {
       await click(view);
+      if (view === '归档') {
+        await searchArchive();
+        await wait(
+          `document.querySelector('article.archive-entry pre')?.textContent === ${JSON.stringify(draft)}`,
+        );
+      }
       await evaluate('window.scrollTo(0, 0)');
       const dimensions = await evaluate(
         '({ width:innerWidth, scroll:document.documentElement.scrollWidth })',
@@ -309,7 +387,9 @@ try {
           format: 'png',
           captureBeyondViewport: false,
         });
-        const filename = `${view === '日历' ? 'calendar-' : ''}${name}.png`;
+        const prefix =
+          view === '日历' ? 'calendar-' : view === '归档' ? 'archive-' : '';
+        const filename = `${prefix}${name}.png`;
         await writeFile(
           join(process.env.LIFEARCHIVE_BROWSER_ARTIFACT_DIR, filename),
           Buffer.from(screenshot.data, 'base64'),
@@ -338,11 +418,24 @@ try {
   console.log(
     'PASS: deleted journal disappears from calendar counts and day detail',
   );
+  await click('归档');
+  await searchArchive();
+  await wait('document.body.textContent.includes("没有找到符合条件的日记")');
+  if (
+    await evaluate(
+      'document.querySelectorAll("article.archive-entry").length > 0',
+    )
+  )
+    throw new Error('Deleted journal remained in search results');
+  if (unsafeSearchTransport || searchRequests < 4)
+    throw new Error(
+      'Search did not use the expected private request transport',
+    );
   await click('退出登录');
   await wait('Boolean(document.querySelector("#username"))');
   if (
     await evaluate(
-      'Boolean(document.querySelector("textarea, article.entry-card")) || localStorage.length > 0 || sessionStorage.length > 0',
+      'Boolean(document.querySelector("textarea, article.entry-card, #archive-query, article.archive-entry")) || localStorage.length > 0 || sessionStorage.length > 0',
     )
   )
     throw new Error('Private state remained after logout');

@@ -1,4 +1,4 @@
-"""Exercise M1 and calendar/day views in an isolated test deployment, never real journals."""
+"""Exercise journals, calendar/day views and search in an isolated test deployment."""
 
 from __future__ import annotations
 
@@ -124,9 +124,16 @@ def main() -> None:
     request("GET", "/entries", 401)
     request("GET", "/calendar?year=2000&month=2", 401)
     request("GET", f"/days/{source_day}", 401)
+    request("POST", "/search", 401, {"query": "private query"})
     session = request("POST", "/auth/login", 200, {"username": args.username, "password": password})
     assert isinstance(session, dict)
     csrf = session["csrf_token"]
+
+    def search_page(query: str, **filters: object) -> dict:
+        result = request("POST", "/search", 200, {"query": query, **filters}, csrf=csrf)
+        assert isinstance(result, dict) and set(result) == {"items", "next_cursor"}
+        return result
+
     user_id = session["user"]["id"]
     cookie = next(item for item in cookies if item.name == "life_archive_session")
     assert cookie.path == "/api/v1" and cookie.has_nonstandard_attr("HttpOnly")
@@ -137,7 +144,8 @@ def main() -> None:
     # Existing test journals may share these dates; assert only our own count changes.
     source_baseline = calendar_count(source_day)
     destination_baseline = calendar_count(destination_day)
-    markdown = "# 隔离验收\n\n中文原文、尾部空格。  \n<script>test-only</script>\n"
+    search_term = f"归档-{uuid4()}-MixedCase-100%_\\/"
+    markdown = f"# 隔离验收\n\n{search_term}\n中文原文、尾部空格。  \n<script>test-only</script>\n"
     payload = {
         "content_md": markdown,
         "entry_date": source_day,
@@ -172,6 +180,26 @@ def main() -> None:
     assert original_day[another["id"]] == another
     print("PASS: leap-day counts, raw Markdown, day pagination and date-bound cursors work")
 
+    search_filters = {"query": search_term.lower(), "date_from": source_day, "date_to": source_day}
+    request("POST", "/search", 403, search_filters)
+    request(
+        "POST", "/search", 403, search_filters, csrf=csrf, source_origin="https://invalid.example"
+    )
+    first_search = search_page(**search_filters, limit=1)
+    assert first_search["items"] == [another] and first_search["next_cursor"]
+    second_search = search_page(**search_filters, limit=1, cursor=first_search["next_cursor"])
+    assert second_search == {"items": [entry], "next_cursor": None}
+    for invalid in (
+        {**search_filters, "query": "different", "cursor": first_search["next_cursor"]},
+        {**search_filters, "date_from": destination_day, "cursor": first_search["next_cursor"]},
+        {**search_filters, "cursor": day_cursor},
+    ):
+        assert request("POST", "/search", 422, invalid, csrf=csrf) == {"detail": "Invalid request"}
+    assert search_page(search_term.replace("%", "0"))["items"] == []
+    print(
+        "PASS: private POST search, literal Chinese/English text, inclusive dates and bound cursors"
+    )
+
     patch = {
         "expected_revision": 1,
         "content_md": markdown + "修改\n",
@@ -193,6 +221,13 @@ def main() -> None:
     assert entry["id"] not in remaining_day and remaining_day[another["id"]] == another
     assert day_entries(destination_day)[entry["id"]] == edited
     print("PASS: moving a journal across months/years updates calendar counts and day views")
+    assert search_page(**search_filters)["items"] == [another]
+    assert search_page(search_term, date_from=destination_day, date_to=destination_day)[
+        "items"
+    ] == [edited]
+    assert search_page(search_term + " 修改")["items"] == []
+    assert request("GET", f"/entries/{entry['id']}/revisions", 200) == history
+    print("PASS: search follows current edits/date changes and leaves revision history unchanged")
 
     if args.restart_postgres:
         subprocess.run(["docker", "compose", "restart", "postgres"], check=True)
@@ -222,6 +257,7 @@ def main() -> None:
         assert calendar_count(source_day) == source_baseline + 1
         assert calendar_count(destination_day) == destination_baseline + 1
         assert day_entries(destination_day)[entry["id"]] == edited
+        assert search_page(search_term, date_to=destination_day)["items"] == [edited]
         print("PASS: owner session and journal revision persist across PostgreSQL restart")
 
     request("DELETE", f"/entries/{entry['id']}?expected_revision=1", 409, csrf=csrf)
@@ -234,12 +270,14 @@ def main() -> None:
     request("DELETE", f"/entries/{another['id']}?expected_revision=1", 204, csrf=csrf)
     assert calendar_count(source_day) == source_baseline
     assert {entry["id"], another["id"]}.isdisjoint(day_entries(source_day))
+    assert search_page(search_term) == {"items": [], "next_cursor": None}
     print("PASS: soft-deleted test journals disappear from calendar counts and day views")
     request("POST", "/auth/logout", 204, csrf=csrf)
     request("GET", "/auth/me", 401)
     request("GET", "/auth/me", 401, extra_headers={"Cookie": original_cookie})
+    request("POST", "/search", 401, {"query": search_term}, csrf=csrf)
     print("PASS: revision-checked soft deletion, no resurrection, logout revocation")
-    print("PASS: all M1 journal and M2 first-slice calendar/day smoke checks completed")
+    print("PASS: all M1 journal and M2 calendar/day/search smoke checks completed")
 
 
 if __name__ == "__main__":
