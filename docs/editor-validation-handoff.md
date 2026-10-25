@@ -1,6 +1,6 @@
 # 输入法验收准备与接手
 
-范围见 [07 工单](../tasks/07-editor-compatibility.md)，具体用例和真实矩阵见 [验收协议](editor-compatibility.md)。本片基于恢复 PR #7 的 `c13c29398b5052e23e0b83f46d302a2da0c13614`，分支 `codex/editor-compatibility`，前序依赖尚未合入。
+范围见 [07 工单](../tasks/07-editor-compatibility.md)，具体用例和真实矩阵见 [验收协议](editor-compatibility.md)。本片 [草稿 PR #8](https://github.com/GZY-q/LifeArchive/pull/8) 基于恢复 PR #7 的 `c13c29398b5052e23e0b83f46d302a2da0c13614`，分支 `codex/editor-compatibility`，前序依赖尚未合入。
 
 **当前仅完成审查、协议和隔离环境准备，真实矩阵尚未完成。** 用户表示可配合 macOS/Windows 桌面操作；未收到并核实的步骤保持待验证。软件版本盘点、Vitest、CDP 或手机尺寸不是候选窗口/移动软键盘的通过证据。
 
@@ -23,6 +23,8 @@ npm test -- --run src/journal/JournalWorkspace.test.tsx src/auth/AuthGate.test.t
 另一次 Chrome/CDP 自动化使用现有 dist、临时 loopback 静态服务和 mocked API：composition 后真实鼠标事件切到日历再回日记，原文保留，事件为 `compositionstart → compositionend → blur`，保存按钮恢复可用，写请求 0。该结果只覆盖合成事件与浏览器引擎，未使用系统拼音候选窗口。
 
 Chrome 执行文件为本机 Google Chrome，应用包版本 `155.0.8059.85`；该次审查未输出 CDP Browser 版本字段。私密审查工件标识 `IME-AUTO-20261026-CDP-NAV-01`，脚本保留在 `/var/folders/82/xbj2snf53jnft554879gqplh0000gn/T/lifearchive-ime-audit-QvgrEW/audit.mjs`。审查退出码 0，关闭了临时服务、WebSocket 和 Chrome，无长驻审查服务。
+
+[CI run 40211516968](https://github.com/GZY-q/LifeArchive/actions/runs/40211516968) 对准备提交 `b2d2398c9d649601f8c38fa2fb61d2ee6670e02f` 的 backend/frontend/compose/restore 四项全部通过：200 个真实 PG 测试、20 个脚本测试、97 个前端测试，共 **317 项**。37 项专项属于前端 97 项子集，不重复计数。真实 Chrome 应用回归、导出、正常恢复和损坏备份拒绝同时通过；这些结果仍不填写真实输入法矩阵。
 
 ## 本轮桌面手测环境
 

@@ -15,9 +15,9 @@
 | M2 往年今日 | [PR #5](https://github.com/GZY-q/LifeArchive/pull/5)，分支 `codex/m2-on-this-day`；[验收](m2-on-this-day-acceptance.md) | PR #4 |
 | 只读日记导出 | [PR #6](https://github.com/GZY-q/LifeArchive/pull/6)，分支 `codex/journal-export`；[验收](journal-export-acceptance.md) | PR #5 |
 | 隔离恢复演练 | [PR #7](https://github.com/GZY-q/LifeArchive/pull/7)，分支 `codex/restore-rehearsal`；[验收](restore-acceptance.md) | PR #6 |
-| 07 输入法验收 | 本轮 `codex/editor-compatibility`，准备/审查已执行，真实矩阵进行中；[接手](editor-validation-handoff.md) | PR #7 |
+| 07 输入法验收 | [草稿 PR #8](https://github.com/GZY-q/LifeArchive/pull/8)，`codex/editor-compatibility`，准备/审查已执行，真实矩阵进行中；[接手](editor-validation-handoff.md) | PR #7 |
 
-先审阅 PR #2，再审阅 PR #3，再审阅搜索 PR #4、往年今日 PR #5、导出 PR #6、恢复演练 PR #7 和输入法验收 PR；每个依赖合入后重新核对后继 PR 的 base、差异和 CI，避免重复提交前一片内容。合并、重写已推送历史和清理旧数据不属于这份计划的自动动作。未经用户明确授权不自行合并。
+先审阅 PR #2，再审阅 PR #3，再审阅搜索 PR #4、往年今日 PR #5、导出 PR #6、恢复演练 PR #7 和输入法验收 PR #8；每个依赖合入后重新核对后继 PR 的 base、差异和 CI，避免重复提交前一片内容。合并、重写已推送历史和清理旧数据不属于这份计划的自动动作。未经用户明确授权不自行合并。
 
 本轮沿用用户连续开发过程中的堆叠 PR 交付：07 的 base 为 `codex/restore-rehearsal`，起点 `c13c29398b5052e23e0b83f46d302a2da0c13614`；PR #2–#7 仍待合入。后续优先完成依赖审阅合入；继续堆叠时记录确切 base/head 和依赖，不把未合入内容当成 main 已有能力。工作区有用户修改时先识别并保留，不重置或覆盖。
 
