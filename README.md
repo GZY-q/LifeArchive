@@ -10,8 +10,9 @@ LifeArchive 是一个独立实现、单用户优先、自托管、面向几十�
 - M2 第一片提供月历计数和日期详情，按日记日期查看补记和同日多条记录；原文分页读取，切换视图保留当前草稿。
 - M2 第二片提供归档搜索：中文/英文连续原文、日记日期范围和分页；手动提交，搜索词只放请求体。当前采用字面子串匹配，尚未验证大规模全文索引性能。
 - M2 第三片提供“往年这一天”：在日历选择日期并展开，分页查看以前年份同月同日的原文；闰日严格匹配，切换日期或刷新重新读取。
-- 编辑器通过独立适配层使用原生 Markdown 文本域；第三方编辑器的中文 IME / 移动端兼容验证仍需补齐。媒体、标签、新闻、AI、导出与备份尚未实现。
-- 最新运行与限制见 [往年今日交接](docs/m2-on-this-day-handoff.md) 和 [验收记录](docs/m2-on-this-day-acceptance.md)；下一步按 [实施与接手计划](docs/next-steps.md) 逐片推进。月历见 [M2 第一片](docs/m2-handoff.md)；认证和日记约定见 [M1 交接](docs/m1-handoff.md)。历史检查保留在 [M1](docs/m1-acceptance.md) / [M0](docs/m0-acceptance.md) 验收记录。
+- 提供只读日记导出 CLI：原始 Markdown、JSON 元数据、所选日记全部修订与 SHA-256 清单；可显式包含软删除记录，拒绝覆盖已有目标。
+- 编辑器通过独立适配层使用原生 Markdown 文本域；第三方编辑器的中文 IME / 移动端兼容验证仍需补齐。媒体、标签、新闻、AI 与完整备份恢复尚未实现。
+- 最新运行与限制见 [日记导出交接](docs/journal-export-handoff.md) 和 [验收记录](docs/journal-export-acceptance.md)；下一步按 [实施与接手计划](docs/next-steps.md) 逐片推进。月历见 [M2 第一片](docs/m2-handoff.md)；认证和日记约定见 [M1 交接](docs/m1-handoff.md)。历史检查保留在 [M1](docs/m1-acceptance.md) / [M0](docs/m0-acceptance.md) 验收记录。
 - 所有设计取舍以 `docs/architecture.md`、`docs/product.md` 和 `docs/data-model.md` 为准。发生冲突时，先在 PR 中指出差异，不要静默改动核心约束。
 
 ## 目标
@@ -82,6 +83,18 @@ docker compose exec -T api alembic upgrade head
 
 修改 `.env` 密码不会修改已初始化数据卷内的数据库密码。不要为解决密码问题直接删除正式数据卷；需要单独规划数据库凭据变更。
 
+### 可移植日记导出
+
+已有实例执行：
+
+```bash
+docker compose exec -T api python -m life_archive.cli export-journal --output /tmp/new-journal-export.zip
+```
+
+默认导出活动日记及其全部修订；用新路径并加 `--include-deleted` 可包含软删除日记。目标必须为绝对路径、父目录已存在；文件以 0600 排他创建，已有文件、目录和符号链接均拒绝。导出通过同一只读一致性快照读取数据，关闭 ZIP 后逐文件复核清单和 SHA-256。
+
+成功 stdout 只有路径和条目/修订数，失败非零退出并保留可能的私密残留；重试需选新路径。复制到宿主、独立核验命令、格式及退出码见 [导出格式](docs/export-format.md)。文件含私密原文且未加密，明确排除认证、媒体/标签等内容；它提供独立阅读能力，整库恢复与自动备份仍需后续验收。
+
 ### 本机开发与检查
 
 使用 Python 3.12、uv 0.12.17、Node 24.19.0、npm 11.17.0。`uv.lock` 和 `package-lock.json` 都已提交；安装使用锁定模式。优先使用中国大陆镜像，镜像不可达时的切换方式见 [交接文档](docs/m0-handoff.md)。
@@ -141,16 +154,16 @@ unset COMPOSE_PROJECT_NAME WEB_PORT
 
 基础脚本检查首页和静态资源、API 代理与错误路由、重复迁移、`pgdata` 卷挂载、数据库重启前后迁移版本一致以及 worker 正常退出。
 
-`scripts/smoke-journal.py` 与 `scripts/smoke-browser.mjs` 会写入并软删除隔离测试日记，需要明确的测试项目名和临时 owner 密码，完整执行顺序见 [往年今日交接](docs/m2-on-this-day-handoff.md)。CI 自动执行 HTTP、PostgreSQL 重启持久化、真实 Chrome 录入/冲突/修订/退出，以及月历计数、日期详情、归档搜索、往年今日、私密查询传输与跨视图草稿保留检查。
+`scripts/smoke-journal.py` 与 `scripts/smoke-browser.mjs` 会写入并软删除隔离测试日记，需要明确的测试项目名和临时 owner 密码，完整执行顺序见 [往年今日交接](docs/m2-on-this-day-handoff.md)。CI 自动执行 HTTP、PostgreSQL 重启持久化、真实 Chrome 录入/冲突/修订/退出，以及月历计数、日期详情、归档搜索、往年今日、私密查询传输与跨视图草稿保留检查。随后在 API 镜像内执行实际导出 CLI，核验哈希、权限、删除策略和源数据未变。
 
 ## 代码目录
 
 ```text
 apps/web/         React 登录、日记、月历/往年今日、搜索、编辑器适配层与测试
-apps/server/      FastAPI 认证/日记/日期聚合、SQLAlchemy、Alembic、独立 worker 与测试
+apps/server/      FastAPI 认证/日记/日期聚合、只读导出 CLI、SQLAlchemy、Alembic、worker 与测试
 infra/Caddyfile   静态 SPA 与 /api 代理
 compose.yaml      web / api / postgres；worker 为可选 profile
-scripts/          安全环境初始化、隔离 Compose / HTTP / Chrome 验收
+scripts/          安全环境初始化、隔离 Compose / HTTP / Chrome / 导出验收
 tests/            环境初始化的标准库测试
 .github/workflows/ci.yml
 docs/             产品/架构设计、各任务验收与后续交接
@@ -171,7 +184,8 @@ tasks/            严格按顺序执行的里程碑工单
 - `tasks/02-calendar-days.md` — M2 第一片：月历和日期详情
 - `tasks/03-archive-search.md` — M2 第二片：私密归档搜索
 - `tasks/04-on-this-day.md` — M2 第三片：往年今日
-- `docs/next-steps.md` — 依赖顺序、05–07 待分配工单与接手提示词
+- `tasks/05-journal-export.md` — 只读日记导出
+- `docs/next-steps.md` — 依赖顺序、06–07 待分配工单与接手提示词
 - `docs/decisions.md` — 核心技术决策
 - `docs/m0-handoff.md` — M0 实现边界、代码入口和 M1 交接
 - `docs/m0-acceptance.md` — 可复核的检查结果与运行限制
@@ -183,6 +197,10 @@ tasks/            严格按顺序执行的里程碑工单
 - `docs/m2-search-acceptance.md` — 归档搜索实际验收证据
 - `docs/m2-on-this-day-handoff.md` — 往年今日契约、实现入口和运行命令
 - `docs/m2-on-this-day-acceptance.md` — 往年今日实际验收证据
+
+- `docs/export-format.md` — 可移植格式 v1、运行与独立哈希核验
+- `docs/journal-export-handoff.md` — 导出实现入口、错误边界和后续交接
+- `docs/journal-export-acceptance.md` — 导出实际验收证据
 
 ## 免责声明
 

@@ -1,6 +1,6 @@
-# Task 数据可携带门槛 — 只读日记导出（待分配）
+# Task 数据可携带门槛 — 只读日记导出
 
-状态：仅规划，未实施；一个 PR。依赖 04 和当前安全日记/修订模型已验收合入。本片提前验证 M5 的最小可移植导出，不代表备份系统或恢复功能已完成。
+状态：用户要求继续后，本轮分配实施；一个 PR。2026-10-25 核对前序 PR #2–#5 仍待合入，沿用现有堆叠交付，从 `codex/m2-on-this-day` 的 `97b53106265a4ddf02885c3437a6def773ef44a5` 新建 `codex/journal-export`，PR base 为往年今日分支；先依次审阅依赖，不自动合并。本片提前验证 M5 的最小可移植导出，不代表备份系统或恢复功能已完成。
 
 ## 固定 CLI
 
@@ -47,7 +47,7 @@ revisions/<entry_uuid>/<revision>.json
 
 覆盖已存在文件/目录/符号链接不被修改、不可写目录/中断失败非零、残留不得被称为成功、`init-owner` 回归。打开 ZIP 逐项核验清单，不能仅断言文件存在。
 
-未来实现后，已有隔离 Compose 实例的运行示例为：
+已有隔离 Compose 实例的运行示例为：
 
 ```bash
 docker compose exec -T api python -m life_archive.cli export-journal --output /tmp/life-archive-export.zip
