@@ -86,6 +86,7 @@ try {
   let allowDialog = false;
   let unexpectedDialog = false;
   let searchRequests = 0;
+  let onThisDayRequests = 0;
   let unsafeSearchTransport = false;
   const pending = new Map();
   function send(method, params = {}, sessionId) {
@@ -104,6 +105,7 @@ try {
     if (message.method === 'Network.requestWillBeSent') {
       const request = message.params.request;
       const url = new URL(request.url);
+      if (url.pathname === '/api/v1/on-this-day') onThisDayRequests += 1;
       if (url.pathname === '/api/v1/search') {
         searchRequests += 1;
         if (request.method !== 'POST' || url.search)
@@ -231,6 +233,10 @@ try {
   await click('日历');
   await wait('Boolean(document.querySelector("#calendar-date"))');
   await selectCalendarDate('2001-02-03');
+  if (onThisDayRequests !== 0)
+    throw new Error('Past-year journals loaded before explicit expansion');
+  await click('展开往年这一天');
+  await wait('document.body.textContent.includes("往年这一天还没有日记")');
   await click('日记');
   await wait(
     'document.querySelector("#journal-content").getClientRects().length > 0',
@@ -325,6 +331,54 @@ try {
   console.log(
     'PASS: calendar preserves draft, counts backdated journal, reads raw day Markdown and handles empty days',
   );
+  await selectCalendarDate('2026-02-03');
+  await click('展开往年这一天');
+  await wait(
+    `document.querySelector('article.on-this-day-entry pre')?.textContent === ${JSON.stringify(draft)}`,
+  );
+  if (
+    (await evaluate(
+      'document.querySelector("article.on-this-day-entry time")?.dateTime',
+    )) !== '2001-02-03'
+  )
+    throw new Error('Past-year result lost its original calendar date');
+  await selectCalendarDate('2001-02-03');
+  await wait('document.body.textContent.includes("往年这一天还没有日记")');
+  if (
+    await evaluate(
+      'Boolean(document.querySelector("article.on-this-day-entry"))',
+    )
+  )
+    throw new Error('On-this-day included the reference year or stale results');
+  await selectCalendarDate('2026-02-04');
+  await wait('document.body.textContent.includes("往年这一天还没有日记")');
+  await selectCalendarDate('2026-02-03');
+  await wait(
+    `document.querySelector('article.on-this-day-entry pre')?.textContent === ${JSON.stringify(draft)}`,
+  );
+  const beforeRefresh = onThisDayRequests;
+  await wait(
+    '[...document.querySelectorAll("button")].some(item => item.textContent.trim() === "刷新日历" && !item.disabled)',
+  );
+  await click('刷新日历');
+  await wait(
+    `document.querySelector('article.on-this-day-entry pre')?.textContent === ${JSON.stringify(draft)}`,
+  );
+  if (
+    onThisDayRequests <= beforeRefresh ||
+    (await evaluate('window.__unsafe === true'))
+  )
+    throw new Error('Expanded past-year journals did not refresh safely');
+  await click('收起往年这一天');
+  if (
+    await evaluate(
+      'Boolean(document.querySelector("article.on-this-day-entry"))',
+    )
+  )
+    throw new Error('Collapsed past-year content remained mounted');
+  console.log(
+    'PASS: lazy past-year view preserves full original date/Markdown, excludes same year, switches dates and refreshes',
+  );
   await click('归档');
   await searchArchive();
   await wait(
@@ -367,6 +421,13 @@ try {
     });
     for (const view of ['日历', '归档', '日记']) {
       await click(view);
+      if (view === '日历') {
+        await selectCalendarDate('2026-02-03');
+        await click('展开往年这一天');
+        await wait(
+          `document.querySelector('article.on-this-day-entry pre')?.textContent === ${JSON.stringify(draft)}`,
+        );
+      }
       if (view === '归档') {
         await searchArchive();
         await wait(
@@ -394,6 +455,22 @@ try {
           join(process.env.LIFEARCHIVE_BROWSER_ARTIFACT_DIR, filename),
           Buffer.from(screenshot.data, 'base64'),
         );
+        if (view === '日历') {
+          await evaluate(
+            'document.querySelector(\'section[aria-label="往年这一天"]\').scrollIntoView()',
+          );
+          const pastYearImage = await cdp('Page.captureScreenshot', {
+            format: 'png',
+            captureBeyondViewport: false,
+          });
+          await writeFile(
+            join(
+              process.env.LIFEARCHIVE_BROWSER_ARTIFACT_DIR,
+              `on-this-day-${name}.png`,
+            ),
+            Buffer.from(pastYearImage.data, 'base64'),
+          );
+        }
       }
       console.log(
         `PASS: ${name} ${view} layout ${width}x${height} without horizontal overflow`,
@@ -405,6 +482,7 @@ try {
   await wait('document.querySelectorAll("article.entry-card").length === 0');
   allowDialog = false;
   await click('日历');
+  await selectCalendarDate('2001-02-03');
   await wait(
     '[...document.querySelectorAll("button")].some(item => item.textContent.trim() === "刷新日历" && !item.disabled)',
   );
@@ -418,6 +496,16 @@ try {
   console.log(
     'PASS: deleted journal disappears from calendar counts and day detail',
   );
+  await selectCalendarDate('2026-02-03');
+  await click('展开往年这一天');
+  await wait('document.body.textContent.includes("往年这一天还没有日记")');
+  if (
+    await evaluate(
+      'Boolean(document.querySelector("article.on-this-day-entry"))',
+    )
+  )
+    throw new Error('Deleted journal remained in past-year results');
+  console.log('PASS: deleted journal disappears from the past-year view');
   await click('归档');
   await searchArchive();
   await wait('document.body.textContent.includes("没有找到符合条件的日记")');
@@ -435,7 +523,7 @@ try {
   await wait('Boolean(document.querySelector("#username"))');
   if (
     await evaluate(
-      'Boolean(document.querySelector("textarea, article.entry-card, #archive-query, article.archive-entry")) || localStorage.length > 0 || sessionStorage.length > 0',
+      'Boolean(document.querySelector("textarea, article.entry-card, #archive-query, article.archive-entry, article.on-this-day-entry")) || localStorage.length > 0 || sessionStorage.length > 0',
     )
   )
     throw new Error('Private state remained after logout');

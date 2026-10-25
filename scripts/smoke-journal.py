@@ -1,4 +1,4 @@
-"""Exercise journals, calendar/day views and search in an isolated test deployment."""
+"""Exercise journals, calendar, search and prior-year views in an isolated deployment."""
 
 from __future__ import annotations
 
@@ -7,12 +7,13 @@ import json
 import os
 import subprocess
 import time
-from datetime import date
+from datetime import date, datetime, timezone
 from http.cookiejar import CookieJar
 from urllib.error import HTTPError
 from urllib.parse import urlencode, urlsplit
 from urllib.request import HTTPCookieProcessor, Request, build_opener
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 
 def main() -> None:
@@ -119,11 +120,50 @@ def main() -> None:
             assert cursor not in seen_cursors, "Day pagination repeated a cursor"
             seen_cursors.add(cursor)
 
+    def past_page(day: str, *, limit: int = 100, cursor: str | None = None) -> dict:
+        params = {"date": day, "limit": str(limit)}
+        if cursor is not None:
+            params["cursor"] = cursor
+        response = request("GET", f"/on-this-day?{urlencode(params)}", 200)
+        assert isinstance(response, dict) and set(response) == {"date", "entries"}
+        assert response["date"] == day
+        selected = date.fromisoformat(day)
+        page = response["entries"]
+        assert set(page) == {"items", "next_cursor"}
+        assert isinstance(page["items"], list) and len(page["items"]) <= limit
+        for item in page["items"]:
+            past = date.fromisoformat(item["entry_date"])
+            assert past.year < selected.year
+            assert (past.month, past.day) == (selected.month, selected.day)
+        assert page["next_cursor"] is None or (
+            isinstance(page["next_cursor"], str) and 0 < len(page["next_cursor"]) <= 2048
+        )
+        return page
+
+    def past_entries(day: str) -> dict[str, dict]:
+        entries = {}
+        cursor = None
+        seen_cursors = set()
+        while True:
+            page = past_page(day, cursor=cursor)
+            for item in page["items"]:
+                assert item["id"] not in entries, "Prior-year pagination repeated an entry"
+                entries[item["id"]] = item
+            cursor = page["next_cursor"]
+            if cursor is None:
+                return entries
+            assert cursor not in seen_cursors, "Prior-year pagination repeated a cursor"
+            seen_cursors.add(cursor)
+
     source_day = "2000-02-29"
     destination_day = "1999-12-31"
+    leap_reference = "2040-02-29"
+    december_reference = "2000-12-31"
     request("GET", "/entries", 401)
     request("GET", "/calendar?year=2000&month=2", 401)
     request("GET", f"/days/{source_day}", 401)
+    request("GET", f"/on-this-day?date={leap_reference}", 401)
+    request("GET", "/on-this-day", 401)
     request("POST", "/search", 401, {"query": "private query"})
     session = request("POST", "/auth/login", 200, {"username": args.username, "password": password})
     assert isinstance(session, dict)
@@ -140,6 +180,15 @@ def main() -> None:
     original_cookie = f"{cookie.name}={cookie.value}"
     assert request("GET", "/auth/me", 200) == session
     print("PASS: anonymous access denied; owner session and HttpOnly cookie work")
+
+    owner_zone = ZoneInfo(session["user"]["timezone"])
+    utc = timezone.utc  # noqa: UP017 -- Standalone smoke also runs on Python 3.9.
+    before_default = datetime.now(utc).astimezone(owner_zone).date().isoformat()
+    default_past = request("GET", "/on-this-day", 200)
+    after_default = datetime.now(utc).astimezone(owner_zone).date().isoformat()
+    assert default_past["date"] in {before_default, after_default}
+    assert past_page("0001-01-01") == {"items": [], "next_cursor": None}
+    assert request("GET", "/on-this-day?date=2023-02-29", 422) == {"detail": "Invalid request"}
 
     # Existing test journals may share these dates; assert only our own count changes.
     source_baseline = calendar_count(source_day)
@@ -180,6 +229,29 @@ def main() -> None:
     assert original_day[another["id"]] == another
     print("PASS: leap-day counts, raw Markdown, day pagination and date-bound cursors work")
 
+    own_ids = {entry["id"], another["id"]}
+    leap_history = past_entries(leap_reference)
+    assert leap_history[entry["id"]] == entry
+    assert leap_history[another["id"]] == another
+    for reference in (source_day, "1996-02-29", "2040-02-28", "2040-03-01"):
+        assert own_ids.isdisjoint(past_entries(reference))
+    first_past = past_page(leap_reference, limit=1)
+    assert len(first_past["items"]) == 1 and first_past["next_cursor"]
+    past_cursor = first_past["next_cursor"]
+    second_past = past_page(leap_reference, limit=1, cursor=past_cursor)
+    assert len(second_past["items"]) == 1
+    assert first_past["items"][0]["id"] != second_past["items"][0]["id"]
+    for invalid in (
+        {"date": "2044-02-29", "cursor": past_cursor},
+        {"date": leap_reference, "cursor": day_cursor},
+    ):
+        assert request("GET", f"/on-this-day?{urlencode(invalid)}", 422) == {
+            "detail": "Invalid request"
+        }
+    request("GET", f"/days/{source_day}?{urlencode({'cursor': past_cursor})}", 422)
+    request("GET", f"/entries?{urlencode({'cursor': past_cursor})}", 422)
+    print("PASS: prior-year raw Markdown, strict leap-day/year rules, pagination and date cursors")
+
     search_filters = {"query": search_term.lower(), "date_from": source_day, "date_to": source_day}
     request("POST", "/search", 403, search_filters)
     request(
@@ -196,6 +268,11 @@ def main() -> None:
     ):
         assert request("POST", "/search", 422, invalid, csrf=csrf) == {"detail": "Invalid request"}
     assert search_page(search_term.replace("%", "0"))["items"] == []
+    assert request(
+        "POST", "/search", 422, {**search_filters, "cursor": past_cursor}, csrf=csrf
+    ) == {"detail": "Invalid request"}
+    search_cursor_params = {"date": leap_reference, "cursor": first_search["next_cursor"]}
+    request("GET", f"/on-this-day?{urlencode(search_cursor_params)}", 422)
     print(
         "PASS: private POST search, literal Chinese/English text, inclusive dates and bound cursors"
     )
@@ -213,6 +290,11 @@ def main() -> None:
     assert history["items"][1]["content_md"] == markdown
     page = request("GET", "/entries?limit=1", 200)
     assert page["next_cursor"]
+    request(
+        "GET",
+        f"/on-this-day?{urlencode({'date': leap_reference, 'cursor': page['next_cursor']})}",
+        422,
+    )
     print("PASS: edits create immutable revisions; stale writes return 409; pagination works")
 
     assert calendar_count(source_day) == source_baseline + 1
@@ -226,8 +308,14 @@ def main() -> None:
         "items"
     ] == [edited]
     assert search_page(search_term + " 修改")["items"] == []
+    changed_leap_history = past_entries(leap_reference)
+    assert entry["id"] not in changed_leap_history
+    assert changed_leap_history[another["id"]] == another
+    assert past_entries(december_reference)[entry["id"]] == edited
+    assert entry["id"] not in past_entries(destination_day)
     assert request("GET", f"/entries/{entry['id']}/revisions", 200) == history
     print("PASS: search follows current edits/date changes and leaves revision history unchanged")
+    print("PASS: prior-year views follow edited diary dates without mutating revision history")
 
     if args.restart_postgres:
         subprocess.run(["docker", "compose", "restart", "postgres"], check=True)
@@ -258,6 +346,8 @@ def main() -> None:
         assert calendar_count(destination_day) == destination_baseline + 1
         assert day_entries(destination_day)[entry["id"]] == edited
         assert search_page(search_term, date_to=destination_day)["items"] == [edited]
+        assert past_entries(december_reference)[entry["id"]] == edited
+        assert past_entries(leap_reference)[another["id"]] == another
         print("PASS: owner session and journal revision persist across PostgreSQL restart")
 
     request("DELETE", f"/entries/{entry['id']}?expected_revision=1", 409, csrf=csrf)
@@ -266,18 +356,22 @@ def main() -> None:
     request("POST", "/entries", 404, payload, csrf=csrf)
     assert calendar_count(destination_day) == destination_baseline
     assert entry["id"] not in day_entries(destination_day)
+    assert entry["id"] not in past_entries(december_reference)
     assert calendar_count(source_day) == source_baseline + 1
     request("DELETE", f"/entries/{another['id']}?expected_revision=1", 204, csrf=csrf)
     assert calendar_count(source_day) == source_baseline
     assert {entry["id"], another["id"]}.isdisjoint(day_entries(source_day))
     assert search_page(search_term) == {"items": [], "next_cursor": None}
+    assert own_ids.isdisjoint(past_entries(leap_reference))
+    print("PASS: soft-deleted test journals disappear from prior-year views")
     print("PASS: soft-deleted test journals disappear from calendar counts and day views")
     request("POST", "/auth/logout", 204, csrf=csrf)
     request("GET", "/auth/me", 401)
     request("GET", "/auth/me", 401, extra_headers={"Cookie": original_cookie})
     request("POST", "/search", 401, {"query": search_term}, csrf=csrf)
+    request("GET", f"/on-this-day?date={leap_reference}", 401)
     print("PASS: revision-checked soft deletion, no resurrection, logout revocation")
-    print("PASS: all M1 journal and M2 calendar/day/search smoke checks completed")
+    print("PASS: all M1 journal and M2 calendar/day/search/prior-year smoke checks completed")
 
 
 if __name__ == "__main__":
