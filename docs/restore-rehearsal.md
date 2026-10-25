@@ -1,6 +1,6 @@
 # 独立 PostgreSQL 恢复演练
 
-本片实现 [06 工单](../tasks/06-restore-rehearsal.md)，验收证据见 [恢复验收](restore-acceptance.md)。脚本只建立自己的合成源、目标项目，不接受正式数据库 URL、已有项目名或外部 dump。其结果用于验证当前日记数据路径可恢复，不代表生产备份、媒体恢复或 RPO/RTO 已验收。
+本片 [PR #7](https://github.com/GZY-q/LifeArchive/pull/7) 实现 [06 工单](../tasks/06-restore-rehearsal.md)，验收证据见 [恢复验收](restore-acceptance.md)。脚本只建立自己的合成源、目标项目，不接受正式数据库 URL、已有项目名或外部 dump。其结果用于验证当前日记数据路径可恢复，不代表生产备份、媒体恢复或 RPO/RTO 已验收。
 
 ## 精确运行
 
