@@ -1,6 +1,6 @@
 # M2 第三片：往年今日交接
 
-本片实现 [04 工单](../tasks/04-on-this-day.md)，证据见 [验收记录](m2-on-this-day-acceptance.md)。基线是搜索 PR #4 的 `409e6875bb6dfc507c0b0319337284e2d750ca51`，分支 `codex/m2-on-this-day`；前序 PR #2–#4 仍待合入，保持依赖顺序并在上游合入后复核 base/差异/CI，不自动合并。
+本片 [PR #5](https://github.com/GZY-q/LifeArchive/pull/5) 实现 [04 工单](../tasks/04-on-this-day.md)，证据见 [验收记录](m2-on-this-day-acceptance.md)。基线是搜索 PR #4 的 `409e6875bb6dfc507c0b0319337284e2d750ca51`，分支 `codex/m2-on-this-day`；前序 PR #2–#4 仍待合入，保持依赖顺序并在上游合入后复核 base/差异/CI，不自动合并。
 
 ## 模块和固定语义
 

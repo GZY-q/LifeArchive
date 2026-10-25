@@ -25,7 +25,13 @@ HTTP 复用脚本自己的两条 2000-02-29 日记：参考 2040-02-29 验证过
 
 ## CI
 
-提交后执行 backend、frontend、compose 全套检查，运行链接与实际结果完成后补记。当前不以本机结果代替 Docker/PG 重启/Linux Chrome 验收。
+[PR #5](https://github.com/GZY-q/LifeArchive/pull/5) 的实现提交 `767a4c337b6432af80df214acd21dd0d8299bc44` 已在 [CI run 40186738386](https://github.com/GZY-q/LifeArchive/actions/runs/40186738386) 完整通过：
+
+- backend：184 项真实 PG 测试和 4 项环境保护测试，Ruff 检查通过。
+- frontend：97 项测试、lint、格式、类型、生产构建通过。
+- compose：Docker 构建、Caddy 路由、重复迁移、PG 重启后的迁移/会话/日记/搜索/往年回看读取、独立 worker 通过；真实 Linux Chrome 完成展开/切日/刷新/折叠、删除与退出，以及日记/月历/归档桌面和手机尺寸回归。
+
+首次后端 CI 在安装 pytest 时遇清华镜像 HTTP 403，未进入测试；只重试失败任务后安装和全套验收通过，没有修改依赖源、版本或锁文件。后续证据提交只更新文档与 PR 链接；审阅时同时核对 PR 最新 head 的检查状态。
 
 ## 影响与限制
 
