@@ -16,9 +16,11 @@ from life_archive.journal.schemas import (
     EntryCreate,
     EntryPage,
     EntryResponse,
+    EntryRestore,
     EntryUpdate,
     RevisionPage,
 )
+from life_archive.journal.trash import restore_entry
 
 router = APIRouter(prefix="/entries", tags=["journal"])
 Database = Annotated[Session, Depends(get_db_session)]
@@ -80,3 +82,8 @@ def revisions(
     return service.list_revisions(
         session, user.id, entry_id, limit=limit, before_revision=before_revision
     )
+
+
+@router.post("/{entry_id}/restore", response_model=EntryResponse)
+def restore(entry_id: UUID, payload: EntryRestore, user: WriteOwner, session: Database) -> Entry:
+    return restore_entry(session, user.id, entry_id, payload.expected_revision)

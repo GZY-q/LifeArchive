@@ -13,7 +13,7 @@ M1 已实现 health、owner 会话和最小日记闭环；M2 已分片扩展月�
 - `GET /entries?limit=20&cursor=...&entry_date=...&tag_id=...`：`{items,next_cursor}`，limit 1–100；按日记日期、创建时间、ID 降序做 keyset 分页。日期和单标签过滤可选、组合为 AND，cursor 不得跨过滤条件复用；无权或不存在的 tag_id 返回空列表。
 - `GET /entries/{id}`：返回 `{id,content_md,entry_date,revision,created_at,updated_at,occurred_at,occurred_timezone,tags}`，occurrence 两项当前为空；无权限、不存在或已删除均 404。
 - `PATCH /entries/{id}`：`{expected_revision,content_md?,entry_date?,tag_ids?}`，至少一项修改，不能为空。原子检查修订号并更新原文/日期/标签、递增 revision、插入新快照；仅改标签同样递增。旧修订 409 / `revision_conflict`。
-- `DELETE /entries/{id}?expected_revision=N`：原子修订检查后软删除，204；保留原文和历史并创建最终快照。没有永久删除/恢复接口。
+- `DELETE /entries/{id}?expected_revision=N`：原子修订检查后软删除，204；保留原文和历史并创建删除快照，可通过回收站恢复。没有永久删除接口。
 - `GET /entries/{id}/revisions?limit=20&before_revision=N`：`{items,next_cursor}`，快照包含 `{revision,content_md,entry_date,changed_at,editor_id,tags}`；按 revision 降序，next_cursor 是下一页的 before_revision。创建时即保留 revision 1。
 - 所有 instants 为 UTC、带时区；`entry_date` 是独立用户日历日期。格式错误 422 使用通用响应，不回显密码、原文或提交值。
 
@@ -25,6 +25,15 @@ M1 已实现 health、owner 会话和最小日记闭环；M2 已分片扩展月�
 - 日记 `tag_ids` 为至多 20 个不重复 UUID：创建省略视为 `[]`，PATCH 省略保持，`[]` 清空，null 拒绝；无权/不存在统一 422，整个日记写入回滚。
 - 当前/修订 `tags` 为按 UUID 升序的 `{id,name}[]`。历史保存名称快照；删除最终修订保留当时标签。标签不解析或改写 Markdown。
 - 本片没有标签改名/删除、层级、归档搜索标签条件或独立的日记标签写接口。
+
+## 09：回收站查看与恢复
+
+- `GET /trash?limit=20&cursor=...`：有效会话必需，仅当前 owner 软删除记录，返回 `{items,next_cursor}`。每项包含现有 EntryResponse 字段及非空带时区 `deleted_at`；limit 1–100，cursor 最长 2048。按 `(deleted_at DESC,id DESC)` keyset，独立版本化游标绑定 owner，不可与其他接口游标混用。分页是继续位置，不是跨请求快照。
+- `POST /entries/{id}/restore`：可信 Origin + CSRF，JSON `{expected_revision:N}`，N 为严格正整数，拒绝未知字段。成功 200 返回活动 EntryResponse；owner、软删除状态和 revision 原子匹配后清除 deleted_at、更新 UTC updated_at、revision +1，并在同事务保存正文/日期/标签快照。
+- 不存在/其他 owner 404；已恢复或 revision 不符 409 / `revision_conflict`。重复恢复不另建修订，旧请求不能恢复后来再次删除的版本。写入响应丢失时先刷新核对，不自动重试为成功。
+- 恢复保留 id、创建时间、创建请求 UUID、原文、日记日期、occurred_*、标签和全部历史；现有列表、月历、日期、搜索、往年今日和默认导出重新包含该记录。导出仍为 v2，不增加迁移。
+- 软删除期间普通读取/编辑/历史和创建 UUID 重放仍为 404；恢复后历史可读，原请求匹配 revision 1 时重放返回同一 id。回收站不另提供已删除历史接口，恢复后可查看。
+- 所有响应包括错误均 no-store，未登录 401；无永久删除、自动清空或批量恢复。
 
 ## M2 第一片：月历与日详情
 
@@ -62,6 +71,7 @@ This is the intended resource boundary, **not implemented endpoints**. Responses
 | GET / PATCH / DELETE | `/entries/{id}` | detail, edit, trash |
 | GET | `/entries/{id}/revisions` | version audit |
 | POST | `/entries/{id}/restore` | recover soft-deleted |
+| GET | `/trash` | private paginated deleted journal entries |
 | POST / GET | `/assets` / `/assets/{id}` | upload, authorized read |
 | GET | `/calendar?year=&month=` | counts by day |
 | GET | `/days/{YYYY-MM-DD}` | journal + digest + events by day |

@@ -18,6 +18,7 @@ type Props = {
   onExpired: () => void;
   onBusy: (busy: boolean) => void;
   disabled: boolean;
+  refreshVersion?: number;
 };
 
 export function JournalWorkspace({
@@ -27,11 +28,13 @@ export function JournalWorkspace({
   onExpired,
   onBusy,
   disabled,
+  refreshVersion = 0,
 }: Props) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [listError, setListError] = useState('');
+  const [requestLoading, setLoading] = useState(true);
+  const [listFailure, setListError] = useState('');
+  const [loadedVersion, setLoadedVersion] = useState(refreshVersion);
   const [actionError, setActionError] = useState('');
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
@@ -44,6 +47,8 @@ export function JournalWorkspace({
   const [filterTagId, setFilterTagId] = useState('');
   const nextRequest = useRef<AbortController | null>(null);
   const firstRequest = useRef<AbortController | null>(null);
+  const loading = requestLoading || loadedVersion !== refreshVersion;
+  const listError = loadedVersion === refreshVersion ? listFailure : '';
 
   useEffect(() => {
     const controller = new AbortController();
@@ -78,20 +83,27 @@ export function JournalWorkspace({
         if (controller.signal.aborted) return;
         setEntries(result.items);
         setCursor(result.next_cursor);
+        setListError('');
       })
       .catch((cause: unknown) => {
         if (controller.signal.aborted) return;
         if (isUnauthorized(cause)) onExpired();
-        else setListError(errorMessage(cause));
+        else {
+          setCursor(null);
+          setListError(errorMessage(cause));
+        }
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoadedVersion(refreshVersion);
+          setLoading(false);
+        }
       });
     return () => {
       controller.abort();
       nextRequest.current?.abort();
     };
-  }, [refresh, onExpired, filterTagId]);
+  }, [refresh, onExpired, filterTagId, refreshVersion]);
 
   function refreshList() {
     firstRequest.current?.abort();
@@ -165,7 +177,7 @@ export function JournalWorkspace({
     if (busy || disabled) return;
     if (
       !window.confirm(
-        `确认删除 ${entry.entry_date} 的这篇日记吗？它将不再显示在列表中。`,
+        `确认删除 ${entry.entry_date} 的这篇日记吗？删除后可从回收站恢复。`,
       )
     )
       return;
@@ -174,7 +186,7 @@ export function JournalWorkspace({
     try {
       await deleteEntry(entry, session.csrf_token);
       setEntries((current) => current.filter((item) => item.id !== entry.id));
-      setSaved('日记已删除。');
+      setSaved('日记已删除，可从回收站恢复。');
       refreshList();
     } catch (cause) {
       if (isUnauthorized(cause)) onExpired();

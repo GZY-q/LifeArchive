@@ -27,7 +27,7 @@ Python 固定为 `.python-version` 的 3.12.14，uv 固定为 `pyproject.toml` �
 | --- | --- |
 | `src/life_archive/main.py` | 组装 health/auth/journal/timeline/search、验证错误脱敏和私密响应 no-store |
 | `src/life_archive/auth/` | owner、Argon2id、会话摘要、CSRF、共享限流、认证依赖 |
-| `src/life_archive/journal/` | owner 范围读写、原子修订、标签目录/关联/历史、分页与创建请求去重 |
+| `src/life_archive/journal/` | owner 范围读写、原子修订、标签、回收站/恢复、分页与创建请求去重 |
 | `src/life_archive/timeline/` | owner 范围月历、日期详情和往年今日；后者在 on_this_day.py 使用独立绑定游标 |
 | `src/life_archive/search/` | owner 范围只读搜索、JSON 校验和条件摘要绑定的独立游标 |
 | `src/life_archive/cli.py` | 唯一 owner 初始化（密码 getpass / stdin）与 export-journal 脱敏分发 |
@@ -67,6 +67,6 @@ docker compose exec -T api alembic current
 
 新增 ORM 模型时继承 `Base`，在 `alembic/env.py` 中导入模型，再生成并审查新迁移。当前 head 为 `0004_entry_tags`，新增标签与关联，旧修订标签回填 `[]`。不要修改已应用的迁移；不要一次创建设计文档中的全部未来表。单元测试中的 SQLite 仅验证基础 Session 行为，业务、并发和迁移用真实 PostgreSQL。
 
-当前范围还包括 `tasks/08-journal-tags.md`：私密标签、随日记保存、历史和列表筛选、导出 v2。标签位于 journal 模块，没有独立服务；归档搜索暂不支持标签条件。后续仅执行明确分配的工单。当前搜索未增加全文索引，不承诺大规模数据性能。继续保持 API 与 worker 入口独立；worker 使用 `python -m life_archive.worker`，没有调度器、业务任务或常驻循环。
+当前范围还包括 `tasks/08-journal-tags.md` 和 `tasks/09-journal-trash.md`：私密标签、历史和列表筛选、导出 v2，以及软删除日记分页和原子恢复。恢复保留原 ID 和历史、增加修订，没有新增迁移。标签/回收站位于 journal 模块，没有独立服务；归档搜索暂不支持标签条件。后续仅执行明确分配的工单。当前搜索未增加全文索引，不承诺大规模数据性能。继续保持 API 与 worker 入口独立；worker 使用 `python -m life_archive.worker`，没有调度器、业务任务或常驻循环。
 
 实现依据：[SQLAlchemy URL](https://docs.sqlalchemy.org/en/20/core/engines.html#creating-urls-programmatically)、[Session 生命周期](https://docs.sqlalchemy.org/en/20/orm/session_basics.html)、[Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)、[Alembic 教程](https://alembic.sqlalchemy.org/en/latest/tutorial.html)、[uv 容器部署](https://docs.astral.sh/uv/guides/integration/docker/)。

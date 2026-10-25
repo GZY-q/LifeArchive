@@ -320,7 +320,7 @@ describe('journal workflow', () => {
       screen.getByRole('article', { name: `${sampleEntry.entry_date} 的日记` }),
     ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: '删除' }));
-    await screen.findByText('日记已删除。');
+    await screen.findByText('日记已删除，可从回收站恢复。');
     expect(confirm).toHaveBeenCalledTimes(2);
     expect(
       fetchMock.mock.calls.find(
