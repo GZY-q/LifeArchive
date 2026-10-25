@@ -14,15 +14,20 @@ from sqlalchemy import select, update
 from life_archive.auth.models import User
 from life_archive.auth.service import create_owner
 from life_archive.db import get_engine, get_session_factory
-from life_archive.journal.models import Entry, EntryRevision
-from life_archive.journal.schemas import EntryCreate, EntryUpdate
+from life_archive.journal.models import Entry, EntryRevision, EntryTag, Tag
+from life_archive.journal.schemas import EntryCreate, EntryUpdate, TagCreate
 from life_archive.journal.service import create_entry, delete_entry, edit_entry
+from life_archive.journal.tags import create_tag
 
 
 def seed() -> dict:
     password = json.load(sys.stdin)["password"]
     with get_session_factory()() as db:
         owner = create_owner(db, "restore-smoke-owner", password, "Pacific/Kiritimati")
+        tags = [
+            create_tag(db, owner.id, TagCreate(name=name))[0]
+            for name in ("合成原始标签", "合成当前标签", "合成软删除标签", "合成未使用标签")
+        ]
         raw = "# 合成恢复 😀\r\n\r\n中文原文尾空格  \n<script>text only</script>\n"
         first, _ = create_entry(
             db,
@@ -31,6 +36,7 @@ def seed() -> dict:
                 content_md=raw,
                 entry_date="2000-02-29",
                 client_request_id=uuid4(),
+                tag_ids=[tags[0].id],
             ),
         )
         edit_entry(
@@ -41,6 +47,7 @@ def seed() -> dict:
                 expected_revision=1,
                 content_md=raw + "第二版\n",
                 entry_date="1999-12-31",
+                tag_ids=[],
             ),
         )
         edit_entry(
@@ -51,6 +58,7 @@ def seed() -> dict:
                 expected_revision=2,
                 content_md=raw + "第三版\n",
                 entry_date="2000-02-29",
+                tag_ids=[tags[1].id],
             ),
         )
         second, _ = create_entry(
@@ -60,6 +68,7 @@ def seed() -> dict:
                 content_md="合成同日第二篇",
                 entry_date="2000-02-29",
                 client_request_id=uuid4(),
+                tag_ids=[tags[0].id],
             ),
         )
         deleted, _ = create_entry(
@@ -69,6 +78,7 @@ def seed() -> dict:
                 content_md="合成软删除历史",
                 entry_date="0001-01-01",
                 client_request_id=uuid4(),
+                tag_ids=[tags[2].id],
             ),
         )
         delete_entry(db, owner.id, deleted.id, 1)
@@ -82,7 +92,17 @@ def seed() -> dict:
             )
         )
         db.commit()
-        return {"first": str(first.id), "second": str(second.id), "deleted": str(deleted.id)}
+        return {
+            "first": str(first.id),
+            "second": str(second.id),
+            "deleted": str(deleted.id),
+            **{
+                key: str(tag.id)
+                for key, tag in zip(
+                    ("tag_original", "tag_current", "tag_deleted", "tag_unused"), tags, strict=True
+                )
+            },
+        }
 
 
 def snapshot() -> dict:
@@ -94,7 +114,7 @@ def snapshot() -> dict:
             .one()
         )
         counts = {}
-        for model in (Entry, EntryRevision):
+        for model in (Entry, EntryRevision, Tag, EntryTag):
             query = select(model.__table__).order_by(*model.__table__.primary_key.columns)
             rows = connection.execute(query).mappings().all()
             counts[model.__tablename__] = len(rows)

@@ -41,8 +41,11 @@ def list_page(
     limit: PageLimit = 20,
     cursor: Annotated[str | None, Query(max_length=1024)] = None,
     entry_date: ArchiveDate | None = None,
+    tag_id: UUID | None = None,
 ) -> EntryPage:
-    return service.list_entries(session, user.id, limit=limit, cursor=cursor, entry_date=entry_date)
+    return service.list_entries(
+        session, user.id, limit=limit, cursor=cursor, entry_date=entry_date, tag_id=tag_id
+    )
 
 
 @router.get("/{entry_id}", response_model=EntryResponse)

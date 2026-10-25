@@ -148,7 +148,8 @@ def rehearse(
     baseline = helper(docker, source, "snapshot")
     require(baseline["heads"] == [baseline["expected_head"]], "Source migration mismatch")
     require(
-        baseline["counts"] == {"entries": 3, "entry_revisions": 6, "deleted": 1},
+        baseline["counts"]
+        == {"entries": 3, "entry_revisions": 6, "deleted": 1, "tags": 4, "entry_tags": 3},
         "Fixture counts mismatch",
     )
     report.update({"migration": baseline["expected_head"], "counts": baseline["counts"]})

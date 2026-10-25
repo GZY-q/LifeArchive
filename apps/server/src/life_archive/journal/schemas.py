@@ -1,6 +1,7 @@
 """Strict write contracts preserve the supplied Markdown without normalization."""
 
 import re
+import unicodedata
 from datetime import date
 from typing import Annotated, Self
 from uuid import UUID
@@ -17,6 +18,50 @@ from pydantic import (
 
 Markdown = Annotated[str, Field(min_length=1, max_length=100_000)]
 RevisionNumber = Annotated[int, Field(strict=True, gt=0)]
+TagIds = Annotated[list[UUID], Field(max_length=20)]
+
+
+def normalize_tag_name(value: str) -> tuple[str, str]:
+    if any(unicodedata.category(char) in {"Cc", "Zl", "Zp"} for char in value):
+        raise ValueError("Tag names cannot contain control characters or line breaks")
+    name = unicodedata.normalize("NFC", value.strip())
+    key = unicodedata.normalize("NFKC", name).casefold()
+    if not 1 <= len(name) <= 40 or not 1 <= len(key) <= 40:
+        raise ValueError("Tag names must contain 1 to 40 characters after normalization")
+    return name, key
+
+
+def unique_tag_ids(value: list[UUID] | None) -> list[UUID] | None:
+    if value is not None and len(set(value)) != len(value):
+        raise ValueError("Duplicate tag IDs are not allowed")
+    return value
+
+
+class TagCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: Annotated[str, Field(min_length=1, max_length=256)]
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        return normalize_tag_name(value)[0]
+
+
+class TagLabel(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+
+
+class TagResponse(TagLabel):
+    created_at: AwareDatetime
+
+
+class TagPage(BaseModel):
+    items: list[TagResponse]
+    next_cursor: UUID | None
 
 
 def _calendar_date(value: object) -> object:
@@ -36,6 +81,9 @@ class EntryCreate(BaseModel):
     content_md: Markdown
     entry_date: ArchiveDate
     client_request_id: UUID | None = None
+    tag_ids: TagIds = Field(default_factory=list)
+
+    _unique_tags = field_validator("tag_ids")(unique_tag_ids)
 
     @field_validator("content_md")
     @classmethod
@@ -53,14 +101,17 @@ class EntryUpdate(BaseModel):
     expected_revision: RevisionNumber
     content_md: Markdown | None = None
     entry_date: ArchiveDate | None = None
+    tag_ids: TagIds | None = None
+
+    _unique_tags = field_validator("tag_ids")(unique_tag_ids)
 
     @model_validator(mode="after")
     def require_changes(self) -> Self:
         changed = self.model_fields_set - {"expected_revision"}
         if not changed:
-            raise ValueError("Provide content_md or entry_date to edit")
+            raise ValueError("Provide content_md, entry_date or tag_ids to edit")
         if any(getattr(self, name) is None for name in changed):
-            raise ValueError("Journal content and entry_date cannot be null")
+            raise ValueError("Journal fields cannot be null")
         if self.content_md is not None and not self.content_md.strip():
             raise ValueError("Journal content must not be blank")
         if self.content_md is not None and "\x00" in self.content_md:
@@ -79,6 +130,7 @@ class EntryResponse(BaseModel):
     occurred_timezone: str | None
     created_at: AwareDatetime
     updated_at: AwareDatetime
+    tags: list[TagLabel]
 
 
 class RevisionResponse(BaseModel):
@@ -89,6 +141,7 @@ class RevisionResponse(BaseModel):
     entry_date: date
     changed_at: AwareDatetime
     editor_id: UUID
+    tags: list[TagLabel]
 
 
 class EntryPage(BaseModel):
@@ -108,3 +161,4 @@ class EntryCursor(BaseModel):
     created_at: AwareDatetime
     id: UUID
     filter_date: date | None
+    filter_tag_id: UUID | None = None

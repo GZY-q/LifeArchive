@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.engine import Connection, Engine
 
 from life_archive.auth.models import User
-from life_archive.journal.models import Entry, EntryRevision
+from life_archive.journal.models import Entry, EntryRevision, EntryTag, Tag
 
 ENTRY_FIELDS = (
     "id",
@@ -29,8 +29,9 @@ ENTRY_FIELDS = (
     "deleted_at",
     "revision",
     "client_request_id",
+    "tags",
 )
-REVISION_FIELDS = ("id", "entry_id", "editor_id", "revision", "entry_date", "changed_at")
+REVISION_FIELDS = ("id", "entry_id", "editor_id", "revision", "entry_date", "changed_at", "tags")
 
 
 class ExportError(Exception):
@@ -122,7 +123,15 @@ def _write_snapshot(connection: Connection, archive: ZipFile, include_deleted: b
     # Core rows avoid an ORM identity map retaining all journal originals.
     with connection.execute(entries.order_by(Entry.id).execution_options(yield_per=100)) as rows:
         for entry in rows.mappings():
-            files.extend(_write_record(archive, f"entries/{entry['id']}", entry, ENTRY_FIELDS))
+            tags = connection.execute(
+                select(Tag.id, Tag.name)
+                .join(EntryTag, (EntryTag.tag_id == Tag.id) & (EntryTag.user_id == Tag.user_id))
+                .where(EntryTag.entry_id == entry["id"], Tag.user_id == owner["id"])
+                .order_by(Tag.id)
+            ).mappings()
+            current = dict(entry)
+            current["tags"] = [dict(tag) for tag in tags]
+            files.extend(_write_record(archive, f"entries/{entry['id']}", current, ENTRY_FIELDS))
             entry_count += 1
             revisions = (
                 select(EntryRevision.__table__)
@@ -135,8 +144,14 @@ def _write_snapshot(connection: Connection, archive: ZipFile, include_deleted: b
                     base = f"revisions/{entry['id']}/{revision['revision']}"
                     files.extend(_write_record(archive, base, revision, REVISION_FIELDS))
                     revision_count += 1
+    # The owner catalog is complete, including unused tags and tags attached only
+    # to deleted entries. The deleted policy limits journals, never this catalog.
+    catalog = connection.execute(
+        select(Tag.id, Tag.name, Tag.created_at).where(Tag.user_id == owner["id"]).order_by(Tag.id)
+    ).mappings()
+    files.append(_write_member(archive, "tags.json", _json_bytes([dict(tag) for tag in catalog])))
     manifest: Manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
         "exported_at": datetime.now(UTC),
         "alembic_revision": heads[0],
         "owner": dict(owner),

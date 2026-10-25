@@ -8,11 +8,11 @@ from uuid import UUID
 
 from fastapi import HTTPException
 from pydantic import ValidationError
-from sqlalchemy import select, tuple_, update
+from sqlalchemy import delete, insert, select, tuple_, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from life_archive.journal.models import Entry, EntryRevision
+from life_archive.journal.models import Entry, EntryRevision, EntryTag, Tag
 from life_archive.journal.schemas import (
     EntryCreate,
     EntryCursor,
@@ -52,6 +52,7 @@ def _snapshot(session: Session, entry: Entry, editor_id: UUID) -> None:
             entry_date=entry.entry_date,
             revision=entry.revision,
             changed_at=entry.updated_at,
+            tags=[{"id": str(tag.id), "name": tag.name} for tag in entry.tags],
         )
     )
 
@@ -70,11 +71,40 @@ def _replay(session: Session, entry: Entry, payload: EntryCreate) -> tuple[Entry
     )
     if original is None:
         raise RuntimeError("Journal original revision is missing")
-    if original.content_md != payload.content_md or original.entry_date != payload.entry_date:
+    if (
+        original.content_md != payload.content_md
+        or original.entry_date != payload.entry_date
+        or {UUID(tag["id"]) for tag in original.tags} != set(payload.tag_ids)
+    ):
         raise _conflict(
             "idempotency_conflict", "This request ID was already used for a different journal entry"
         )
     return entry, False
+
+
+def _validate_tags(session: Session, user_id: UUID, tag_ids: list[UUID]) -> None:
+    if not tag_ids:
+        return
+    found = set(session.scalars(select(Tag.id).where(Tag.user_id == user_id, Tag.id.in_(tag_ids))))
+    if found != set(tag_ids):
+        raise HTTPException(status_code=422, detail="One or more tags are unavailable")
+
+
+def _replace_tags(session: Session, entry: Entry, tag_ids: list[UUID]) -> None:
+    # Entry has already been inserted or locked by the successful revision CAS.
+    session.execute(
+        delete(EntryTag).where(EntryTag.entry_id == entry.id, EntryTag.user_id == entry.user_id)
+    )
+    if tag_ids:
+        session.execute(
+            insert(EntryTag),
+            [
+                {"entry_id": entry.id, "tag_id": tag_id, "user_id": entry.user_id}
+                for tag_id in tag_ids
+            ],
+        )
+    # Core association writes bypass the identity map, including eager-loaded relationships.
+    session.expire(entry, ["tags"])
 
 
 def create_entry(session: Session, user_id: UUID, payload: EntryCreate) -> tuple[Entry, bool]:
@@ -94,8 +124,10 @@ def create_entry(session: Session, user_id: UUID, payload: EntryCreate) -> tuple
         revision=1,
     )
     try:
+        _validate_tags(session, user_id, payload.tag_ids)
         session.add(entry)
         session.flush()  # Obtain its ID before adding the foreign-key snapshot.
+        _replace_tags(session, entry, payload.tag_ids)
         _snapshot(session, entry, user_id)
         session.commit()
     except IntegrityError:
@@ -119,7 +151,7 @@ def _failed_compare_and_swap(session: Session, user_id: UUID, entry_id: UUID) ->
 
 
 def edit_entry(session: Session, user_id: UUID, entry_id: UUID, payload: EntryUpdate) -> Entry:
-    changes = payload.model_dump(exclude_unset=True, exclude={"expected_revision"})
+    changes = payload.model_dump(exclude_unset=True, exclude={"expected_revision", "tag_ids"})
     try:
         entry = session.scalar(
             update(Entry)
@@ -135,6 +167,9 @@ def edit_entry(session: Session, user_id: UUID, entry_id: UUID, payload: EntryUp
         )
         if entry is None:
             _failed_compare_and_swap(session, user_id, entry_id)
+        if payload.tag_ids is not None:
+            _validate_tags(session, user_id, payload.tag_ids)
+            _replace_tags(session, entry, payload.tag_ids)
         _snapshot(session, entry, user_id)
         session.commit()
     except Exception:
@@ -167,12 +202,12 @@ def delete_entry(session: Session, user_id: UUID, entry_id: UUID, expected_revis
         raise
 
 
-def _decode_cursor(cursor: str, filter_date: date | None) -> EntryCursor:
+def _decode_cursor(cursor: str, filter_date: date | None, tag_id: UUID | None) -> EntryCursor:
     try:
         decoded = base64.b64decode(cursor + "=" * (-len(cursor) % 4), altchars=b"-_", validate=True)
         value = EntryCursor.model_validate_json(decoded)
-        if value.filter_date != filter_date:
-            raise ValueError("Cursor belongs to a different date filter")
+        if value.filter_date != filter_date or value.filter_tag_id != tag_id:
+            raise ValueError("Cursor belongs to a different filter")
     except (ValueError, binascii.Error, ValidationError) as error:
         raise HTTPException(status_code=422, detail="Invalid pagination cursor") from error
     return value
@@ -185,12 +220,23 @@ def list_entries(
     limit: int,
     cursor: str | None,
     entry_date: date | None,
+    tag_id: UUID | None = None,
 ) -> EntryPage:
     statement = select(Entry).where(Entry.user_id == user_id, Entry.deleted_at.is_(None))
     if entry_date is not None:
         statement = statement.where(Entry.entry_date == entry_date)
+    if tag_id is not None:
+        statement = statement.where(
+            select(EntryTag.entry_id)
+            .where(
+                EntryTag.entry_id == Entry.id,
+                EntryTag.user_id == user_id,
+                EntryTag.tag_id == tag_id,
+            )
+            .exists()
+        )
     if cursor is not None:
-        position = _decode_cursor(cursor, entry_date)
+        position = _decode_cursor(cursor, entry_date, tag_id)
         statement = statement.where(
             tuple_(Entry.entry_date, Entry.created_at, Entry.id)
             < (position.entry_date, position.created_at, position.id)
@@ -210,6 +256,7 @@ def list_entries(
             created_at=last.created_at,
             id=last.id,
             filter_date=entry_date,
+            filter_tag_id=tag_id,
         )
         next_cursor = (
             base64.urlsafe_b64encode(position.model_dump_json().encode()).decode().rstrip("=")

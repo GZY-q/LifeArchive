@@ -1,4 +1,6 @@
 import { invalidResponse, isRecord, request } from './client';
+import { tagLabelsFrom } from './tags';
+import type { TagLabel } from './tags';
 
 export type Entry = {
   id: string;
@@ -7,15 +9,18 @@ export type Entry = {
   revision: number;
   created_at: string;
   updated_at: string;
+  tags: TagLabel[];
 };
 export type EntryRevision = Pick<
   Entry,
-  'content_md' | 'entry_date' | 'revision'
+  'content_md' | 'entry_date' | 'revision' | 'tags'
 > & {
   changed_at: string;
   editor_id: string;
 };
-export type EntryInput = Pick<Entry, 'content_md' | 'entry_date'>;
+export type EntryInput = Pick<Entry, 'content_md' | 'entry_date'> & {
+  tag_ids: string[];
+};
 export type CreateInput = EntryInput & { client_request_id: string };
 
 export function entryFrom(value: unknown): Entry {
@@ -30,15 +35,17 @@ export function entryFrom(value: unknown): Entry {
     typeof value.updated_at !== 'string'
   )
     return invalidResponse();
-  return value as Entry;
+  return { ...value, tags: tagLabelsFrom(value.tags) } as Entry;
 }
 
 export async function listEntries(
   cursor?: string,
   signal?: AbortSignal,
+  tagId?: string,
 ): Promise<{ items: Entry[]; next_cursor: string | null }> {
   const query = new URLSearchParams({ limit: '20' });
   if (cursor) query.set('cursor', cursor);
+  if (tagId) query.set('tag_id', tagId);
   const value = await request(`/entries?${query}`, { signal });
   if (
     !isRecord(value) ||
@@ -113,7 +120,7 @@ export async function listRevisions(
       typeof item.editor_id !== 'string'
     )
       return invalidResponse();
-    return item as EntryRevision;
+    return { ...item, tags: tagLabelsFrom(item.tags) } as EntryRevision;
   });
   return { items, next_cursor: value.next_cursor as number | null };
 }

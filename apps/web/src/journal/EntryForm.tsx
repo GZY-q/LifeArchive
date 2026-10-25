@@ -4,8 +4,11 @@ import type { FormEvent } from 'react';
 import { ApiError, errorMessage, isUnauthorized } from '../api/client';
 import { createEntry, getEntry, updateEntry } from '../api/journal';
 import type { Entry } from '../api/journal';
+import type { Tag } from '../api/tags';
 import { MarkdownEditor } from '../components/MarkdownEditor';
 import type { Draft } from './draft';
+import { TagBadges } from './TagBadges';
+import { TagPicker } from './TagPicker';
 
 type Props = {
   draft: Draft;
@@ -16,6 +19,11 @@ type Props = {
   onCancel: () => void;
   onExpired: () => void;
   onBusy: (busy: boolean) => void;
+  tags: Tag[];
+  tagsLoading: boolean;
+  tagsError: string;
+  onTagCreated: (tag: Tag) => void;
+  onTagsRetry: () => void;
 };
 
 export function EntryForm({
@@ -27,6 +35,11 @@ export function EntryForm({
   onCancel,
   onExpired,
   onBusy,
+  tags,
+  tagsLoading,
+  tagsError,
+  onTagCreated,
+  onTagsRetry,
 }: Props) {
   const [busy, setBusy] = useState(false);
   const [composing, setComposing] = useState(false);
@@ -51,6 +64,7 @@ export function EntryForm({
           {
             content_md: draft.content_md,
             entry_date: draft.entry_date,
+            tag_ids: draft.tag_ids,
             expected_revision: draft.original.revision,
           },
           csrfToken,
@@ -59,6 +73,7 @@ export function EntryForm({
         const input = draft.pendingCreate ?? {
           content_md: draft.content_md,
           entry_date: draft.entry_date,
+          tag_ids: [...draft.tag_ids],
           client_request_id: crypto.randomUUID(),
         };
         onDraft({ ...draft, pendingCreate: input });
@@ -152,6 +167,20 @@ export function EntryForm({
         <p id="journal-content-hint" className="small-note">
           Markdown 原文 · 仅保存在当前页面，保存后才写入档案。
         </p>
+        <TagPicker
+          tags={tags}
+          selected={draft.tag_ids}
+          original={draft.original?.tags ?? []}
+          csrfToken={csrfToken}
+          disabled={locked}
+          loading={tagsLoading}
+          error={tagsError}
+          onChange={(tag_ids) => onDraft({ ...draft, tag_ids })}
+          onCreated={onTagCreated}
+          onRetry={onTagsRetry}
+          onExpired={onExpired}
+          onBusy={onBusy}
+        />
         {error && (
           <p className="error-message" role="alert">
             {error}
@@ -178,6 +207,7 @@ export function EntryForm({
                   服务器版本 {latest.revision} · {latest.entry_date}
                 </h3>
                 <pre className="markdown-text">{latest.content_md}</pre>
+                <TagBadges tags={latest.tags} />
                 <button
                   type="button"
                   className="secondary-button"

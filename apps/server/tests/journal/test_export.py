@@ -16,18 +16,31 @@ from sqlalchemy.schema import CreateSchema
 from life_archive import cli
 from life_archive.auth.models import AuthSession, LoginThrottle, User
 from life_archive.journal import export as exporter
-from life_archive.journal.models import Entry, EntryRevision
-from life_archive.journal.schemas import EntryCreate, EntryUpdate
+from life_archive.journal.models import Entry, EntryRevision, EntryTag, Tag
+from life_archive.journal.schemas import EntryCreate, EntryUpdate, TagCreate
 from life_archive.journal.service import create_entry, delete_entry, edit_entry
+from life_archive.journal.tags import create_tag
 
 RAW = "  # 中文 /../ 标题 😀\r\n\r\n<script>private()</script>  \n组合字 e\u0301\n"
 
 
-def create(db: Session, owner: User, content: str = RAW, day: str = "2000-02-29") -> Entry:
+def create(
+    db: Session,
+    owner: User,
+    content: str = RAW,
+    day: str = "2000-02-29",
+    *,
+    tags: tuple[Tag, ...] = (),
+) -> Entry:
     entry, _ = create_entry(
         db,
         owner.id,
-        EntryCreate(content_md=content, entry_date=day, client_request_id=uuid4()),
+        EntryCreate(
+            content_md=content,
+            entry_date=day,
+            client_request_id=uuid4(),
+            tag_ids=[tag.id for tag in tags],
+        ),
     )
     return entry
 
@@ -59,7 +72,7 @@ def database_rows(db: Session) -> dict:
         model.__tablename__: db.execute(
             select(model.__table__).order_by(*model.__table__.primary_key.columns)
         ).all()
-        for model in (User, Entry, EntryRevision, AuthSession, LoginThrottle)
+        for model in (User, Entry, EntryRevision, Tag, EntryTag, AuthSession, LoginThrottle)
     }
 
 
@@ -72,7 +85,11 @@ def test_raw_metadata_all_selected_revisions_and_deleted_policy_are_read_only(
     include_deleted: bool,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    entry = create(db_session, journal_owner)
+    tags = [
+        create_tag(db_session, journal_owner.id, TagCreate(name=name))[0]
+        for name in ("原始标签", "当前标签", "未使用标签", "仅软删除标签")
+    ]
+    entry = create(db_session, journal_owner, tags=(tags[0],))
     original_request = entry.client_request_id
     edited = RAW + "\n修订保留尾空格  \n"
     edit_entry(
@@ -83,6 +100,7 @@ def test_raw_metadata_all_selected_revisions_and_deleted_policy_are_read_only(
             expected_revision=1,
             content_md=edited,
             entry_date="0001-01-01",
+            tag_ids=[tags[1].id],
         ),
     )
     instant = datetime(2026, 10, 25, 12, 30, tzinfo=timezone(timedelta(hours=8)))
@@ -104,15 +122,20 @@ def test_raw_metadata_all_selected_revisions_and_deleted_policy_are_read_only(
     )
     db_session.add(LoginThrottle(id=1, window_started_at=instant, attempts=2))
     db_session.commit()
-    deleted = create(db_session, journal_owner, "软删除仍保留历史", "9999-12-31")
+    deleted = create(db_session, journal_owner, "软删除仍保留历史", "9999-12-31", tags=(tags[3],))
     delete_entry(db_session, journal_owner.id, deleted.id, 1)
     before = database_rows(db_session)
     caplog.clear()
     output = tmp_path / "archive.zip"
     result = exporter.export_journal(pg_engine, output, include_deleted=include_deleted)
     manifest, files = inspect_export(output)
-    assert manifest["schema_version"] == 1
-    assert manifest["alembic_revision"] == "0003_journal"
+    assert manifest["schema_version"] == 2
+    assert manifest["alembic_revision"] == "0004_entry_tags"
+    catalog = json.loads(files["tags.json"])
+    assert catalog == [
+        {"id": str(tag.id), "name": tag.name, "created_at": tag.created_at.isoformat()}
+        for tag in sorted(tags, key=lambda tag: tag.id)
+    ]
     assert datetime.fromisoformat(manifest["exported_at"]).utcoffset() == timedelta(0)
     assert manifest["owner"] == {
         "id": str(journal_owner.id),
@@ -139,6 +162,7 @@ def test_raw_metadata_all_selected_revisions_and_deleted_policy_are_read_only(
         "revision",
         "client_request_id",
         "markdown_path",
+        "tags",
     }
     assert current["id"] == str(entry.id) and current["user_id"] == str(journal_owner.id)
     assert current["client_request_id"] == str(original_request)
@@ -146,6 +170,7 @@ def test_raw_metadata_all_selected_revisions_and_deleted_policy_are_read_only(
     assert current["deleted_at"] is None
     assert current["occurred_at"] == "2026-10-25T04:30:00+00:00"
     assert current["occurred_timezone"] == "Asia/Shanghai"
+    assert current["tags"] == [{"id": str(tags[1].id), "name": tags[1].name}]
     for field in ("created_at", "updated_at"):
         assert datetime.fromisoformat(current[field]).utcoffset() == timedelta(0)
     for number, content in ((1, RAW), (2, edited)):
@@ -160,17 +185,22 @@ def test_raw_metadata_all_selected_revisions_and_deleted_policy_are_read_only(
             "entry_date",
             "changed_at",
             "markdown_path",
+            "tags",
         }
         assert revision["entry_id"] == str(entry.id)
         assert revision["editor_id"] == str(journal_owner.id)
         assert revision["entry_date"] == ("2000-02-29" if number == 1 else "0001-01-01")
         assert datetime.fromisoformat(revision["changed_at"]).utcoffset() == timedelta(0)
+        tag = tags[number - 1]
+        assert revision["tags"] == [{"id": str(tag.id), "name": tag.name}]
     if include_deleted:
         removed = json.loads(files[f"entries/{deleted.id}.json"])
         assert removed["deleted_at"] is not None and removed["revision"] == 2
         assert removed["occurred_at"] is None and removed["occurred_timezone"] is None
         assert files[f"revisions/{deleted.id}/1.md"] == "软删除仍保留历史".encode()
         assert removed["entry_date"] == "9999-12-31"
+        assert removed["tags"] == [{"id": str(tags[3].id), "name": tags[3].name}]
+        assert json.loads(files[f"revisions/{deleted.id}/2.json"])["tags"] == removed["tags"]
     else:
         assert all(str(deleted.id) not in path for path in files)
     public_metadata = json.dumps(manifest) + "".join(
@@ -190,7 +220,8 @@ def test_consistent_read_only_snapshot_survives_concurrent_edit_and_delete(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    first = create(db_session, journal_owner, "快照原文一")
+    original_tag, _ = create_tag(db_session, journal_owner.id, TagCreate(name="快照标签"))
+    first = create(db_session, journal_owner, "快照原文一", tags=(original_tag,))
     second = create(db_session, journal_owner, "快照原文二")
     initial = {str(first.id): "快照原文一", str(second.id): "快照原文二"}
     original_write = ZipFile.writestr
@@ -201,6 +232,7 @@ def test_consistent_read_only_snapshot_survives_concurrent_edit_and_delete(
         if not triggered and info.filename.startswith("entries/"):
             triggered = True
             with session_factory() as writer:
+                changed_tag, _ = create_tag(writer, journal_owner.id, TagCreate(name="并发标签"))
                 edit_entry(
                     writer,
                     journal_owner.id,
@@ -209,6 +241,7 @@ def test_consistent_read_only_snapshot_survives_concurrent_edit_and_delete(
                         expected_revision=1,
                         content_md="并发新原文",
                         entry_date="2026-10-25",
+                        tag_ids=[changed_tag.id],
                     ),
                 )
                 delete_entry(writer, journal_owner.id, second.id, 1)
@@ -230,12 +263,20 @@ def test_consistent_read_only_snapshot_survives_concurrent_edit_and_delete(
     exporter.export_journal(pg_engine, output)
     manifest, files = inspect_export(output)
     assert triggered and manifest["entry_count"] == manifest["revision_count"] == 2
+    assert [tag["name"] for tag in json.loads(files["tags.json"])] == ["快照标签"]
     for entry_id, content in initial.items():
         assert files[f"entries/{entry_id}.md"] == content.encode()
         assert files[f"revisions/{entry_id}/1.md"] == content.encode()
         assert json.loads(files[f"entries/{entry_id}.json"])["revision"] == 1
         assert json.loads(files[f"entries/{entry_id}.json"])["deleted_at"] is None
         assert f"revisions/{entry_id}/2.md" not in files
+        expected_tags = (
+            [{"id": str(original_tag.id), "name": original_tag.name}]
+            if entry_id == str(first.id)
+            else []
+        )
+        for path in (f"entries/{entry_id}.json", f"revisions/{entry_id}/1.json"):
+            assert json.loads(files[path])["tags"] == expected_tags
     with session_factory() as reader:
         assert reader.get(Entry, first.id).content_md == "并发新原文"
         assert reader.get(Entry, second.id).deleted_at is not None
@@ -250,7 +291,8 @@ def test_empty_archive_and_repeated_exports_have_stable_data_files(
     empty = tmp_path / "empty.zip"
     exporter.export_journal(pg_engine, empty)
     manifest, files = inspect_export(empty)
-    assert manifest["entry_count"] == manifest["revision_count"] == 0 and files == {}
+    assert manifest["entry_count"] == manifest["revision_count"] == 0
+    assert files == {"tags.json": b"[]\n"}
     create(db_session, journal_owner)
     outputs = [tmp_path / "one.zip", tmp_path / "two.zip"]
     for path in outputs:
@@ -299,7 +341,7 @@ def test_export_streams_more_than_one_batch_of_entries_and_revisions(
     exporter.export_journal(pg_engine, output)
     manifest, files = inspect_export(output)
     assert manifest["entry_count"] == 103 and manifest["revision_count"] == 203
-    assert len(files) == (103 + 203) * 2
+    assert len(files) == (103 + 203) * 2 + 1
     for row in entries:
         assert files[f"entries/{row['id']}.md"] == row["content_md"].encode()
     for row in revisions:

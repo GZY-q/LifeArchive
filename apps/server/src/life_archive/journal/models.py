@@ -8,14 +8,53 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     String,
     Text,
     UniqueConstraint,
+    and_,
+    text,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from life_archive.db import Base
+
+
+class Tag(Base):
+    __tablename__ = "tags"
+    __table_args__ = (
+        UniqueConstraint("user_id", "name_key", name="uq_tags_user_id_name_key"),
+        UniqueConstraint("id", "user_id", name="uq_tags_id_user_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(40), nullable=False)
+    name_key: Mapped[str] = mapped_column(String(40), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class EntryTag(Base):
+    __tablename__ = "entry_tags"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["entry_id", "user_id"],
+            ["entries.id", "entries.user_id"],
+            name="fk_entry_tags_entry_owner",
+        ),
+        ForeignKeyConstraint(
+            ["tag_id", "user_id"],
+            ["tags.id", "tags.user_id"],
+            name="fk_entry_tags_tag_owner",
+        ),
+        Index("ix_entry_tags_owner_tag_entry", "user_id", "tag_id", "entry_id"),
+    )
+
+    entry_id: Mapped[UUID] = mapped_column(primary_key=True)
+    tag_id: Mapped[UUID] = mapped_column(primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(nullable=False)
 
 
 class Entry(Base):
@@ -24,6 +63,7 @@ class Entry(Base):
         UniqueConstraint(
             "user_id", "client_request_id", name="uq_entries_user_id_client_request_id"
         ),
+        UniqueConstraint("id", "user_id", name="uq_entries_id_user_id"),
         CheckConstraint("revision > 0", name="positive_revision"),
     )
 
@@ -38,6 +78,14 @@ class Entry(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revision: Mapped[int] = mapped_column(nullable=False)
     client_request_id: Mapped[UUID | None]
+    tags: Mapped[list[Tag]] = relationship(
+        secondary=EntryTag.__table__,
+        primaryjoin=lambda: and_(Entry.id == EntryTag.entry_id, Entry.user_id == EntryTag.user_id),
+        secondaryjoin=lambda: and_(Tag.id == EntryTag.tag_id, Tag.user_id == EntryTag.user_id),
+        order_by=lambda: Tag.id,
+        viewonly=True,
+        lazy="selectin",
+    )
 
 
 Index(
@@ -63,3 +111,6 @@ class EntryRevision(Base):
     entry_date: Mapped[date] = mapped_column(Date, nullable=False)
     revision: Mapped[int] = mapped_column(nullable=False)
     changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    tags: Mapped[list[dict[str, str]]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
+    )

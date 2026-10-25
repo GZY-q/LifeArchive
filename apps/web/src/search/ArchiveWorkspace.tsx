@@ -5,6 +5,7 @@ import { errorMessage, isUnauthorized } from '../api/client';
 import type { Entry } from '../api/journal';
 import { searchEntries } from '../api/search';
 import type { SearchFilters } from '../api/search';
+import { TagBadges } from '../journal/TagBadges';
 import { readSearchForm } from './form';
 import type { SearchForm } from './form';
 
@@ -212,6 +213,7 @@ export function ArchiveWorkspace({
                 {' · '}版本 {entry.revision}
               </p>
               <pre className="markdown-text">{entry.content_md}</pre>
+              <TagBadges tags={entry.tags} />
             </article>
           ))}
           {cursor && !requestError && (

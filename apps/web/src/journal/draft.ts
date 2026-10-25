@@ -21,6 +21,7 @@ export function emptyDraft(timezone: string): Draft {
   return {
     content_md: '',
     entry_date: todayIn(timezone),
+    tag_ids: [],
     original: null,
     pendingCreate: null,
   };
@@ -29,9 +30,15 @@ export function emptyDraft(timezone: string): Draft {
 export function hasUnsavedDraft(draft: Draft | null): boolean {
   if (!draft) return false;
   if (draft.pendingCreate) return true;
-  if (!draft.original) return draft.content_md.length > 0;
+  if (!draft.original)
+    return draft.content_md.length > 0 || draft.tag_ids.length > 0;
   return (
     draft.content_md !== draft.original.content_md ||
-    draft.entry_date !== draft.original.entry_date
+    draft.entry_date !== draft.original.entry_date ||
+    [...draft.tag_ids].sort().join(',') !==
+      draft.original.tags
+        .map((tag) => tag.id)
+        .sort()
+        .join(',')
   );
 }

@@ -14,7 +14,7 @@ def test_applied_journal_migration_matches_orm_metadata(pg_engine: Engine) -> No
         _reflected: bool,
         _compare_to: SchemaItem | None,
     ) -> bool:
-        return kind != "table" or name in {"entries", "entry_revisions"}
+        return kind != "table" or name in {"entries", "entry_revisions", "tags", "entry_tags"}
 
     with pg_engine.connect() as connection:
         context = MigrationContext.configure(connection, opts={"include_object": include_journal})

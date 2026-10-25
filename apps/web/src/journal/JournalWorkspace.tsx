@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { Session } from '../api/auth';
 import { ApiError, errorMessage, isUnauthorized } from '../api/client';
 import { deleteEntry, listEntries } from '../api/journal';
 import type { Entry } from '../api/journal';
+import { listTags } from '../api/tags';
+import type { Tag } from '../api/tags';
 import { emptyDraft, hasUnsavedDraft } from './draft';
 import type { Draft } from './draft';
 import { EntryCard } from './EntryCard';
@@ -35,10 +37,43 @@ export function JournalWorkspace({
   const [refresh, setRefresh] = useState(0);
   const [formKey, setFormKey] = useState(0);
   const [saved, setSaved] = useState('');
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [tagsLoading, setTagsLoading] = useState(true);
+  const [tagsError, setTagsError] = useState('');
+  const [tagsRefresh, setTagsRefresh] = useState(0);
+  const [filterTagId, setFilterTagId] = useState('');
+  const nextRequest = useRef<AbortController | null>(null);
+  const firstRequest = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
-    void listEntries(undefined, controller.signal)
+    void listTags(controller.signal)
+      .then((items) => {
+        if (!controller.signal.aborted)
+          setTags((current) =>
+            [
+              ...items,
+              ...current.filter(
+                (tag) => !items.some((item) => item.id === tag.id),
+              ),
+            ].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN')),
+          );
+      })
+      .catch((cause: unknown) => {
+        if (controller.signal.aborted) return;
+        if (isUnauthorized(cause)) onExpired();
+        else setTagsError(errorMessage(cause));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setTagsLoading(false);
+      });
+    return () => controller.abort();
+  }, [tagsRefresh, onExpired]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    firstRequest.current = controller;
+    void listEntries(undefined, controller.signal, filterTagId)
       .then((result) => {
         if (controller.signal.aborted) return;
         setEntries(result.items);
@@ -52,10 +87,15 @@ export function JournalWorkspace({
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
-    return () => controller.abort();
-  }, [refresh, onExpired]);
+    return () => {
+      controller.abort();
+      nextRequest.current?.abort();
+    };
+  }, [refresh, onExpired, filterTagId]);
 
   function refreshList() {
+    firstRequest.current?.abort();
+    nextRequest.current?.abort();
     setLoading(true);
     setListError('');
     setRefresh((current) => current + 1);
@@ -63,10 +103,13 @@ export function JournalWorkspace({
 
   async function loadMore() {
     if (!cursor || loading) return;
+    const controller = new AbortController();
+    nextRequest.current = controller;
     setLoading(true);
     setListError('');
     try {
-      const result = await listEntries(cursor);
+      const result = await listEntries(cursor, controller.signal, filterTagId);
+      if (controller.signal.aborted) return;
       setEntries((current) => [
         ...current,
         ...result.items.filter(
@@ -75,10 +118,11 @@ export function JournalWorkspace({
       ]);
       setCursor(result.next_cursor);
     } catch (cause) {
+      if (controller.signal.aborted) return;
       if (isUnauthorized(cause)) onExpired();
       else setListError(errorMessage(cause));
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }
 
@@ -98,6 +142,7 @@ export function JournalWorkspace({
         ? {
             content_md: entry.content_md,
             entry_date: entry.entry_date,
+            tag_ids: entry.tags.map((tag) => tag.id),
             original: entry,
             pendingCreate: null,
           }
@@ -153,6 +198,21 @@ export function JournalWorkspace({
         onDraft={onDraft}
         onExpired={onExpired}
         onBusy={writing}
+        tags={tags}
+        tagsLoading={tagsLoading}
+        tagsError={tagsError}
+        onTagCreated={(tag) =>
+          setTags((current) =>
+            [...current.filter((item) => item.id !== tag.id), tag].sort(
+              (a, b) => a.name.localeCompare(b.name, 'zh-CN'),
+            ),
+          )
+        }
+        onTagsRetry={() => {
+          setTagsLoading(true);
+          setTagsError('');
+          setTagsRefresh((value) => value + 1);
+        }}
         onCancel={() => changeDraft(null)}
         onSaved={() => {
           onDraft(emptyDraft(session.user.timezone));
@@ -178,6 +238,30 @@ export function JournalWorkspace({
             刷新列表
           </button>
         </div>
+        <div className="tag-filter">
+          <label htmlFor="journal-tag-filter">按标签筛选</label>
+          <select
+            id="journal-tag-filter"
+            value={filterTagId}
+            disabled={busy || disabled || tagsLoading}
+            onChange={(event) => {
+              firstRequest.current?.abort();
+              nextRequest.current?.abort();
+              setEntries([]);
+              setCursor(null);
+              setLoading(true);
+              setListError('');
+              setFilterTagId(event.target.value);
+            }}
+          >
+            <option value="">全部标签</option>
+            {tags.map((tag) => (
+              <option key={tag.id} value={tag.id}>
+                {tag.name}
+              </option>
+            ))}
+          </select>
+        </div>
         {actionError && (
           <p className="error-message" role="alert">
             {actionError}
@@ -200,8 +284,12 @@ export function JournalWorkspace({
         )}
         {!loading && !listError && !entries.length && (
           <div className="empty-state">
-            <h3>还没有记录</h3>
-            <p>从一件小事开始，写下你的第一篇日记。</p>
+            <h3>{filterTagId ? '这个标签下还没有记录' : '还没有记录'}</h3>
+            <p>
+              {filterTagId
+                ? '保存带有此标签的日记后，会显示在这里。'
+                : '从一件小事开始，写下你的第一篇日记。'}
+            </p>
           </div>
         )}
         {listError && (

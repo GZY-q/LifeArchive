@@ -9,13 +9,22 @@ M1 已实现 health、owner 会话和最小日记闭环；M2 已分片扩展月�
 - `GET /auth/me`：同上会话响应，未认证 401；CSRF token 仅放内存，不放 localStorage。
 - `POST /auth/logout`：可信 `Origin` + `X-CSRF-Token`，撤销会话并清 cookie，204。
 - 所有日记接口都要求有效会话，写入还要求可信 `Origin` 和本会话的 `X-CSRF-Token`。私密 API 响应，包括错误响应，均 `Cache-Control: no-store`。
-- `POST /entries`：`{content_md,entry_date,client_request_id?}`。新建 201，创建重放 200。Markdown 非空、最多 100,000 字符，原文不 trim；日期严格为 `YYYY-MM-DD`。相同请求 ID 对比 revision 1 的原始内容/日期，不同请求体 409 / `idempotency_conflict`。已软删除的请求重放 404，不复活。
-- `GET /entries?limit=20&cursor=...&entry_date=...`：`{items,next_cursor}`，limit 1–100；按日记日期、创建时间、ID 降序做 keyset 分页。日期过滤可选，cursor 不得跨日期过滤复用。
-- `GET /entries/{id}`：返回 `{id,content_md,entry_date,revision,created_at,updated_at,occurred_at,occurred_timezone}`，最后两项当前为空；无权限、不存在或已删除均 404。
-- `PATCH /entries/{id}`：`{expected_revision,content_md?,entry_date?}`，至少一项修改，不能为空。原子检查修订号并更新原文、递增 revision、插入新快照；旧修订 409 / `revision_conflict`。
+- `POST /entries`：`{content_md,entry_date,client_request_id?,tag_ids?}`。新建 201，创建重放 200。Markdown 非空、最多 100,000 字符，原文不 trim；日期严格为 `YYYY-MM-DD`。相同请求 ID 对比 revision 1 的原始内容/日期/标签 ID 集合，不同请求体 409 / `idempotency_conflict`。已软删除的请求重放 404，不复活。
+- `GET /entries?limit=20&cursor=...&entry_date=...&tag_id=...`：`{items,next_cursor}`，limit 1–100；按日记日期、创建时间、ID 降序做 keyset 分页。日期和单标签过滤可选、组合为 AND，cursor 不得跨过滤条件复用；无权或不存在的 tag_id 返回空列表。
+- `GET /entries/{id}`：返回 `{id,content_md,entry_date,revision,created_at,updated_at,occurred_at,occurred_timezone,tags}`，occurrence 两项当前为空；无权限、不存在或已删除均 404。
+- `PATCH /entries/{id}`：`{expected_revision,content_md?,entry_date?,tag_ids?}`，至少一项修改，不能为空。原子检查修订号并更新原文/日期/标签、递增 revision、插入新快照；仅改标签同样递增。旧修订 409 / `revision_conflict`。
 - `DELETE /entries/{id}?expected_revision=N`：原子修订检查后软删除，204；保留原文和历史并创建最终快照。没有永久删除/恢复接口。
-- `GET /entries/{id}/revisions?limit=20&before_revision=N`：`{items,next_cursor}`，快照包含 `{revision,content_md,entry_date,changed_at,editor_id}`；按 revision 降序，next_cursor 是下一页的 before_revision。创建时即保留 revision 1。
+- `GET /entries/{id}/revisions?limit=20&before_revision=N`：`{items,next_cursor}`，快照包含 `{revision,content_md,entry_date,changed_at,editor_id,tags}`；按 revision 降序，next_cursor 是下一页的 before_revision。创建时即保留 revision 1。
 - 所有 instants 为 UTC、带时区；`entry_date` 是独立用户日历日期。格式错误 422 使用通用响应，不回显密码、原文或提交值。
+
+## 08：日记标签
+
+- `GET /tags?limit=100&cursor=<UUID>`：owner 范围 `{items,next_cursor}`，每项 `{id,name,created_at}`；limit 1–200，UUID 升序，next_cursor 为末项 UUID 或 null，不静默截断目录。
+- `POST /tags`：`{name}`，新建 201；同 owner 同规范名称幂等返回已有标签 200。沿用会话、可信 Origin、CSRF 和 no-store。
+- 名称请求长度 1–256，展示名去首尾空白并 NFC，唯一键 NFKC + casefold；规范化后均为 1–40 字符，不允许控制字符/换行/空名。
+- 日记 `tag_ids` 为至多 20 个不重复 UUID：创建省略视为 `[]`，PATCH 省略保持，`[]` 清空，null 拒绝；无权/不存在统一 422，整个日记写入回滚。
+- 当前/修订 `tags` 为按 UUID 升序的 `{id,name}[]`。历史保存名称快照；删除最终修订保留当时标签。标签不解析或改写 Markdown。
+- 本片没有标签改名/删除、层级、归档搜索标签条件或独立的日记标签写接口。
 
 ## M2 第一片：月历与日详情
 
@@ -49,6 +58,7 @@ This is the intended resource boundary, **not implemented endpoints**. Responses
 | POST | `/auth/logout` | revoke session |
 | GET | `/auth/me` | current owner |
 | GET / POST | `/entries` | paginated list, create |
+| GET / POST | `/tags` | private paginated catalog, idempotent name creation |
 | GET / PATCH / DELETE | `/entries/{id}` | detail, edit, trash |
 | GET | `/entries/{id}/revisions` | version audit |
 | POST | `/entries/{id}/restore` | recover soft-deleted |

@@ -14,13 +14,13 @@ from sqlalchemy import select
 
 from life_archive.auth.models import AuthSession, LoginThrottle, User
 from life_archive.db import get_engine
-from life_archive.journal.models import Entry, EntryRevision
+from life_archive.journal.models import Entry, EntryRevision, EntryTag, Tag
 
 
 def fingerprint() -> str:
     digest = hashlib.sha256()
     with get_engine().connect() as connection:
-        for model in (User, AuthSession, LoginThrottle, Entry, EntryRevision):
+        for model in (User, AuthSession, LoginThrottle, Entry, EntryRevision, Tag, EntryTag):
             digest.update(model.__tablename__.encode())
             query = select(model.__table__).order_by(*model.__table__.primary_key.columns)
             with connection.execute(query.execution_options(yield_per=100)) as rows:
@@ -60,7 +60,7 @@ def main() -> None:
         assert output.stat().st_mode & 0o777 == 0o600
         with ZipFile(output) as archive:
             manifest = json.loads(archive.read("manifest.json"))
-            assert manifest["schema_version"] == 1
+            assert manifest["schema_version"] == 2
             assert manifest["deleted_policy"] == (
                 "include_deleted" if include_deleted else "active_only"
             )
@@ -70,6 +70,8 @@ def main() -> None:
             names = archive.namelist()
             assert len(names) == len(set(names)) and names[-1] == "manifest.json"
             assert set(names) == {"manifest.json"} | {item["path"] for item in manifest["files"]}
+            catalog = json.loads(archive.read("tags.json"))
+            assert all(set(tag) == {"id", "name", "created_at"} for tag in catalog)
             for item in manifest["files"]:
                 data = archive.read(item["path"])
                 assert len(data) == item["bytes"]

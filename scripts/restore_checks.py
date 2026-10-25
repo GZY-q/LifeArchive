@@ -64,6 +64,28 @@ class Client:
             [row["revision"] for row in result["history"]["items"]] == [3, 2, 1],
             "Restored revision history mismatch",
         )
+        result["tags"] = self.request("/tags?limit=200")
+        require(
+            {tag["id"] for tag in result["tags"]["items"]}
+            == {ids[key] for key in ("tag_original", "tag_current", "tag_deleted", "tag_unused")}
+            and result["tags"]["next_cursor"] is None,
+            "Restored tag catalog mismatch",
+        )
+        require(
+            [tag["id"] for tag in result["entry"]["tags"]] == [ids["tag_current"]]
+            and [[tag["id"] for tag in row["tags"]] for row in result["history"]["items"]]
+            == [[ids["tag_current"]], [], [ids["tag_original"]]],
+            "Restored current or historical tags mismatch",
+        )
+        result["tag_filter"] = self.request("/entries?tag_id=" + ids["tag_original"])
+        require(
+            [row["id"] for row in result["tag_filter"]["items"]] == [ids["second"]],
+            "Restored tag filter mismatch",
+        )
+        require(
+            self.request("/entries?tag_id=" + ids["tag_deleted"])["items"] == [],
+            "Deleted tagged entry unexpectedly visible",
+        )
         self.request("/entries/" + ids["deleted"], status=404)
         result["calendar"] = self.request("/calendar?year=2000&month=2")
         require(
@@ -104,7 +126,7 @@ def file_sha256(path: Path) -> str:
 def verified_manifest(archive: ZipFile) -> dict:
     manifest = json.loads(archive.read("manifest.json"))
     require(
-        manifest["schema_version"] == 1 and manifest["deleted_policy"] == "include_deleted",
+        manifest["schema_version"] == 2 and manifest["deleted_policy"] == "include_deleted",
         "Unexpected portable export format or deleted policy",
     )
     names = archive.namelist()
@@ -112,6 +134,7 @@ def verified_manifest(archive: ZipFile) -> dict:
     require(
         len(names) == len(set(names))
         and paths == sorted(set(paths))
+        and "tags.json" in paths
         and set(names) == set(paths) | {"manifest.json"},
         "Export member set mismatch",
     )
