@@ -1,6 +1,6 @@
 # 后续实施与接手计划
 
-当前功能范围为 [08：日记标签](../tasks/08-journal-tags.md)，用户要求子代理继续开发、减少测试行为。实现私密标签、日记原子保存/历史、列表筛选与导出 v2；接手见 [标签交接](journal-tags-handoff.md)。[07 输入法验收](../tasks/07-editor-compatibility.md) 的完整真实矩阵仍待证据，继续按 [兼容协议](editor-compatibility.md) 记录，不以自动化代替真实操作。
+当前功能范围为 [09：回收站查看与恢复](../tasks/09-journal-trash.md)，用户要求继续开发，沿用子代理协作和减少测试的偏好。实现私密回收站分页、原子恢复、修订和跨视图草稿保护；接手见 [回收站交接](journal-trash-handoff.md)。[07 输入法验收](../tasks/07-editor-compatibility.md) 的完整真实矩阵仍待证据，继续按 [兼容协议](editor-compatibility.md) 记录，不以自动化代替真实操作。
 
 ## 先处理当前交付链
 
@@ -16,11 +16,12 @@
 | 只读日记导出 | [PR #6](https://github.com/GZY-q/LifeArchive/pull/6)，分支 `codex/journal-export`；[验收](journal-export-acceptance.md) | PR #5 |
 | 隔离恢复演练 | [PR #7](https://github.com/GZY-q/LifeArchive/pull/7)，分支 `codex/restore-rehearsal`；[验收](restore-acceptance.md) | PR #6 |
 | 07 输入法验收 | [草稿 PR #8](https://github.com/GZY-q/LifeArchive/pull/8)，`codex/editor-compatibility`，准备/审查已执行，真实矩阵进行中；[接手](editor-validation-handoff.md) | PR #7 |
-| 08 日记标签 | `codex/journal-tags`；功能与必要检查见 [交接](journal-tags-handoff.md) | PR #8 的准备文档，代码基线延续 PR #7；不依赖真机矩阵完成 |
+| 08 日记标签 | [PR #9](https://github.com/GZY-q/LifeArchive/pull/9)，`codex/journal-tags`；[交接](journal-tags-handoff.md)，该提交自动 CI 已通过 | PR #8 的准备文档，代码基线延续 PR #7；不依赖真机矩阵完成 |
+| 09 回收站 | `codex/journal-trash`；[交接](journal-trash-handoff.md) | PR #9 |
 
 先审阅 PR #2，再审阅 PR #3，再审阅搜索 PR #4、往年今日 PR #5、导出 PR #6、恢复演练 PR #7 和输入法验收 PR #8；每个依赖合入后重新核对后继 PR 的 base、差异和 CI，避免重复提交前一片内容。合并、重写已推送历史和清理旧数据不属于这份计划的自动动作。未经用户明确授权不自行合并。
 
-本轮沿用堆叠 PR：08 的 base 为 `codex/editor-compatibility`，起点 `1b0f169e65d855a20bdbacfb66d2489ab5d7ec30`；此前 PR 仍待按依赖审阅。不能把未合入内容当成 main 已有能力。工作区用户修改（包括 `.DS_Store`）保留，不重置或覆盖。
+本轮沿用堆叠 PR：09 的 base 为 `codex/journal-tags`，起点 `a323f7d14a943bf1278330ab93870742974504f0`；此前 PR 仍待按依赖审阅。不能把未合入内容当成 main 已有能力。工作区用户修改（包括 `.DS_Store`）保留，不重置或覆盖。
 
 ## 建议顺序
 
@@ -31,6 +32,7 @@
 | [06 独立恢复演练](../tasks/06-restore-rehearsal.md)（已交付） | 在全新 Compose 项目验证 PG dump/restore，并比较原文、修订、owner、日期和迁移 | 依赖已验收的 PR #6，真实 Docker CI 验证 | 覆盖现有库、通用导入器、Restic/远端凭据 |
 | [07 真实输入法兼容性](../tasks/07-editor-compatibility.md)（进行中） | 有设备/系统/浏览器/输入法版本和证据的中文输入法、移动软键盘矩阵 | 有可访问的真实设备；06 后作集中验收 | 强制替换编辑器、用模拟事件宣称真机通过 |
 | [08 日记标签](../tasks/08-journal-tags.md) | 创建/选择、原子保存和历史、单标签列表过滤、导出 v2 | 现有日记/修订与导出；真机输入法可独立继续 | 标签删除/改名/层级、附件、新闻、AI |
+| [09 回收站](../tasks/09-journal-trash.md) | 已删除记录分页、恢复保留原 ID/标签/历史、并发修订检查、草稿保护 | 现有软删除与标签修订；无需迁移 | 永久清除、批量操作、自动清空 |
 
 05、06 将 M5 中最小的数据可携带、可恢复门槛提前，以便继续积累日记前有可验证的退路。05 的应用导出与 06 的数据库恢复是两个不同交付物：前者供独立读取，后者证明当前数据库可以恢复。计划没有完成或取消 M5；定时备份、加密异地副本、媒体一致性、保留策略和正式环境冷恢复仍属于 M5。
 
@@ -38,12 +40,12 @@
 
 ## 之后再切片的缺口
 
-- M1：08 补齐基础标签；其余包括附件与授权媒体、trash/restore、密码轮换管理，以及需要实际产品决策的 Markdown 富预览。不能宣布所有 M1 验收项已完成。
+- M1：08 补齐基础标签，09 补齐回收站/恢复；其余包括附件与授权媒体、密码轮换管理，以及需要实际产品决策的 Markdown 富预览。不能宣布所有 M1 验收项已完成。
 - M2：04 之后核对月历、单日原文、搜索、往年今日的验收证据；不要用功能列表替代跨时区、补记、权限和草稿回归。
 - M3/M4：保留 [原 roadmap](roadmap.md) 中新闻摄取、任务台账、来源校验、AI 摘要的先后关系。未另行分配之前不启动，不预建未来表或服务。
 - M5：在 05/06 的最小门槛上继续做正式部署、私密媒体、自动加密异地备份和完整冷恢复；不能把一次合成数据演练称为生产备份上线。
 
-08 后建议下一片为“回收站查看与恢复”：列出 owner 软删除记录、原子恢复、修订与列表/搜索一致性；不含永久清除，不重建创建 UUID。先写 09 有界工单再实施。附件需要私密存储和媒体授权，应另开一片。当前不自动开始这些功能。
+09 后建议下一片为“归档标签条件”：在现有私密搜索 JSON 中加入单标签过滤，与关键词/日期 AND，游标摘要绑定标签，前端复用标签目录。先写 10 有界工单，不扩展为语义搜索或新闻搜索。附件需要私密存储、媒体授权与导出/备份一致性，应另开一片。当前不自动开始这些功能。
 
 ## 每片的完成门槛
 

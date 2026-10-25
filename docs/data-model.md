@@ -16,6 +16,8 @@ Schema is a **design draft**, not an applied migration. Codex should implement t
 
 Task 08 applies tags with `0004_entry_tags`. Names use trimmed NFC for display and NFKC + casefold for owner-scoped uniqueness. An entry has at most 20 tags. Tags and journal fields share one revision/CAS transaction; immutable revision `tags` stores UUID/name snapshots, sorted by UUID. Existing revisions receive `[]`. Tag IDs do not alter raw Markdown. Creation replay compares revision 1's tag-ID set alongside the original text/date. Tag rename/delete and tag hierarchies remain deferred.
 
+Task 09 reuses these tables without a migration. Restore atomically matches owner, non-null `deleted_at`, and expected revision; clears deletion, increments revision, updates the UTC modification instant, and saves an immutable content/date/tag snapshot. IDs, creation request UUIDs, original dates, occurrence metadata, and historical revisions survive delete/restore cycles. Repeated or stale restore requests conflict; no permanent purge exists. The recycle-bin cursor orders by `(deleted_at DESC,id DESC)` and binds owner separately from journal cursors. No performance guarantee for large recycle bins is made yet.
+
 ## News
 
 - `news_sources`: feed/API config, enabled, license notes.

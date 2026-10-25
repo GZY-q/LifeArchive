@@ -133,6 +133,21 @@ class EntryResponse(BaseModel):
     tags: list[TagLabel]
 
 
+class EntryRestore(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision: RevisionNumber
+
+
+class TrashEntryResponse(EntryResponse):
+    deleted_at: AwareDatetime
+
+
+class TrashPage(BaseModel):
+    items: list[TrashEntryResponse]
+    next_cursor: str | None
+
+
 class RevisionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

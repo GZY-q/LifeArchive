@@ -9,6 +9,7 @@ import { JournalWorkspace } from '../journal/JournalWorkspace';
 import { CalendarWorkspace } from '../calendar/CalendarWorkspace';
 import { ArchiveWorkspace } from '../search/ArchiveWorkspace';
 import { emptySearchForm } from '../search/form';
+import { TrashWorkspace } from '../trash/TrashWorkspace';
 import { LoginForm } from './LoginForm';
 
 export function AuthGate() {
@@ -21,11 +22,12 @@ export function AuthGate() {
   const [signingOut, setSigningOut] = useState(false);
   const [writeBusy, setWriteBusy] = useState(false);
   const [revalidating, setRevalidating] = useState(false);
-  const [view, setView] = useState<'journal' | 'calendar' | 'archive'>(
-    'journal',
-  );
+  const [view, setView] = useState<
+    'journal' | 'calendar' | 'archive' | 'trash'
+  >('journal');
   const [calendarDate, setCalendarDate] = useState<string | null>(null);
   const [searchForm, setSearchForm] = useState(emptySearchForm);
+  const [journalRefresh, setJournalRefresh] = useState(0);
   const ownerId = useRef<string | null>(null);
 
   useEffect(() => {
@@ -218,6 +220,15 @@ export function AuthGate() {
         >
           归档
         </button>
+        <button
+          type="button"
+          className={`nav-item ${view === 'trash' ? 'selected' : ''}`}
+          aria-current={view === 'trash' ? 'page' : undefined}
+          disabled={signingOut || revalidating || writeBusy}
+          onClick={() => setView('trash')}
+        >
+          回收站
+        </button>
       </nav>
       {draft && (
         <div hidden={view !== 'journal'}>
@@ -227,6 +238,7 @@ export function AuthGate() {
             onDraft={setDraft}
             onExpired={expire}
             onBusy={setWriteBusy}
+            refreshVersion={journalRefresh}
             disabled={signingOut || revalidating || view !== 'journal'}
           />
         </div>
@@ -246,6 +258,16 @@ export function AuthGate() {
           onForm={setSearchForm}
           csrfToken={session.csrf_token}
           onExpired={expire}
+          disabled={signingOut || revalidating}
+        />
+      )}
+      {view === 'trash' && (
+        <TrashWorkspace
+          csrfToken={session.csrf_token}
+          timezone={session.user.timezone}
+          onExpired={expire}
+          onBusy={setWriteBusy}
+          onRestored={() => setJournalRefresh((value) => value + 1)}
           disabled={signingOut || revalidating}
         />
       )}

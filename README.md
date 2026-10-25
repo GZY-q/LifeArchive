@@ -13,6 +13,7 @@ LifeArchive 是一个独立实现、单用户优先、自托管、面向几十�
 - 提供只读日记导出 CLI：原始 Markdown、JSON 元数据、所选日记全部修订与 SHA-256 清单；可显式包含软删除记录，拒绝覆盖已有目标。
 - 提供隔离恢复演练脚本：新建合成源和空目标，验证 PG dump/restore、原文/修订/导出一致性和重启后读取；完整自动化加密备份仍待后续。
 - 日记标签提供私密目录、创建/勾选、随日记原子保存、修订快照和列表单标签筛选；导出 v2 保留标签目录与历史标签。范围和接手见 [08 工单](tasks/08-journal-tags.md) 与 [标签交接](docs/journal-tags-handoff.md)。
+- 回收站支持分页查看软删除日记和逐篇恢复；保留原文、标签、原 ID 与历史，恢复创建新修订并检查并发版本。没有永久清除功能，见 [09 工单](tasks/09-journal-trash.md) 与 [交接](docs/journal-trash-handoff.md)。
 - 编辑器通过独立适配层使用原生 Markdown 文本域；07 的真实输入法验收正在进行，协议、环境和自动化审查已准备，完整真机矩阵仍待证据。详见 [兼容矩阵](docs/editor-compatibility.md) 与 [验收接手](docs/editor-validation-handoff.md)。媒体、新闻、AI 与完整备份恢复尚未实现。
 - 最新运行与限制见 [恢复演练交接](docs/restore-rehearsal.md) 和 [验收记录](docs/restore-acceptance.md)；下一步按 [实施与接手计划](docs/next-steps.md) 逐片推进。月历见 [M2 第一片](docs/m2-handoff.md)；认证和日记约定见 [M1 交接](docs/m1-handoff.md)。历史检查保留在 [M1](docs/m1-acceptance.md) / [M0](docs/m0-acceptance.md) 验收记录。
 - 所有设计取舍以 `docs/architecture.md`、`docs/product.md` 和 `docs/data-model.md` 为准。发生冲突时，先在 PR 中指出差异，不要静默改动核心约束。
@@ -200,6 +201,7 @@ tasks/            严格按顺序执行的里程碑工单
 - `tasks/06-restore-rehearsal.md` — 隔离 PostgreSQL 恢复演练
 - `tasks/07-editor-compatibility.md` — 真实输入法验收（进行中，不能用模拟事件代替真机）
 - `tasks/08-journal-tags.md` — 日记标签、列表筛选、标签历史及导出 v2
+- `tasks/09-journal-trash.md` — 回收站查看、原子恢复与草稿保护
 - `docs/next-steps.md` — 依赖顺序、验收状态与接手提示词
 - `docs/decisions.md` — 核心技术决策
 - `docs/m0-handoff.md` — M0 实现边界、代码入口和 M1 交接
@@ -215,6 +217,7 @@ tasks/            严格按顺序执行的里程碑工单
 
 - `docs/export-format.md` — 可移植格式 v2、v1 阅读说明及独立哈希核验
 - `docs/journal-tags-handoff.md` — 标签实现、必要检查结果与后续入口
+- `docs/journal-trash-handoff.md` — 回收站实现、运行方式与后续入口
 - `docs/journal-export-handoff.md` — 导出实现入口、错误边界和后续交接
 - `docs/journal-export-acceptance.md` — 导出实际验收证据
 

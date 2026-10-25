@@ -1,6 +1,6 @@
 # Journal module · M1
 
-`router.router` and `tag_router.router` mount at `/api/v1` for `/entries` and `/tags`. Authentication uses
+`router.router`, `tag_router.router`, and `trash_router.router` mount at `/api/v1` for `/entries`, `/tags`, and `/trash`. Authentication uses
 the shared request session; writes commit explicitly because authentication has
 already started a read transaction. Originals and snapshots commit together.
 
@@ -17,8 +17,8 @@ already started a read transaction. Originals and snapshots commit together.
   changes also create a revision; each snapshot stores `{id,name}` labels.
 - Delete requires `?expected_revision=N`, marks the entry deleted, increments
   its revision and saves a final content snapshot. It returns 204, retains all
-  records, and exposes no restore or permanent-delete operation. Deleted IDs,
-  revisions and creation retries return 404; a retry cannot recreate the entry.
+  records. Deleted IDs, revisions and creation retries return 404 until explicitly
+  restored; a creation retry cannot restore the entry. There is no permanent-delete operation.
 - Lists return `{items, next_cursor}` with `limit=20` (1–100), optional
   `entry_date=YYYY-MM-DD`, optional `tag_id=<UUID>` (combined with date using AND),
   and an opaque cursor. Ordering is descending
@@ -38,10 +38,16 @@ already started a read transaction. Originals and snapshots commit together.
 - Entry and revision responses include `tags: [{id,name}]`, ordered by UUID.
   Current associations have database-enforced owner consistency. Unknown and
   unauthorized tag IDs receive the same generic 422 response on writes.
+- Trash: `GET /trash` lists deleted entries plus `deleted_at`, ordered by deletion
+  instant and ID descending, with a separate owner-bound `trash-v1` cursor.
+  `POST /entries/{id}/restore {expected_revision}` checks owner/deleted state/revision
+  atomically, clears deletion, increments revision, and saves the same original/date/tags
+  as a new immutable snapshot. Unknown IDs return 404; stale or already-restored IDs
+  return 409. Restore preserves creation UUID, ID and all history; no new entry is created.
 
 Migration `0004_entry_tags` follows `0003_journal`. It adds `tags`, `entry_tags`
 and revision JSONB label snapshots (existing revisions receive `[]`). It does
-not implement media, restoration, news or AI.
+not implement media, news or AI. Task 09 adds restoration without a new migration.
 Tests under `tests/journal` use the shared real-PostgreSQL fixtures, including
 simultaneous creation and edits. Run with the test database configuration from
 the server README. For the focused tag checks:

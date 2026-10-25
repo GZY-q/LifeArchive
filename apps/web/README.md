@@ -1,6 +1,8 @@
-# LifeArchive Web · M2 往年今日
+# LifeArchive Web · 日记、标签与回收站
 
 实现 owner 登录、日记录入/列表/编辑/删除确认、版本比对和修订历史，以及月历计数、日期详情、归档搜索和往年今日。切换日历/归档时保留日记组件与内存草稿；会话失效时移除所有视图的私密 DOM，重新登录可继续同页草稿。完整部署和边界见根 README 与 `docs/m2-on-this-day-handoff.md`。
+
+标签支持创建、勾选、原子保存、历史显示和列表单标签筛选。回收站支持 owner 软删除日记分页与逐篇恢复；导航保留日记内存草稿，恢复成功仅刷新列表，不重挂编辑器。恢复请求期间阻止导航/退出，409 或网络不确定提示刷新核对。没有永久清除。交接见 [标签](../../docs/journal-tags-handoff.md) 与 [回收站](../../docs/journal-trash-handoff.md)。
 
 ## 本地开发
 
@@ -45,6 +47,7 @@ npm run build
 | `src/journal/`                       | 日期、创建重试 UUID、列表、409 草稿比对与修订历史 |
 | `src/calendar/`                      | 公历日期运算、月历、分页日期详情与往年今日        |
 | `src/search/`                        | 搜索表单、已提交条件快照、分页/重试与竞态取消     |
+| `src/trash/`                         | 软删除日记分页、恢复及并发/不确定结果处理         |
 | `src/components/MarkdownEditor.tsx`  | 受控原文适配、IME composition 状态                |
 | `src/api/health.ts`                  | 同源健康请求及响应校验                            |
 | `src/components/HealthIndicator.tsx` | 请求状态、8 秒超时、取消与手动重试                |
