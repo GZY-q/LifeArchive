@@ -1,6 +1,6 @@
 # API contract — /api/v1
 
-M1 已实现 health、owner 会话和最小日记闭环；M2 第一片扩展月历和日记日期详情。下方 V1 全量资源表仍包含未来草案，未列入已实现章节的资源尚未实现。
+M1 已实现 health、owner 会话和最小日记闭环；M2 已分片扩展月历、日记日期详情和基础归档搜索。下方 V1 全量资源表仍包含未来草案，未列入已实现章节的资源尚未实现。
 
 ## M1 已实现
 
@@ -24,6 +24,14 @@ M1 已实现 health、owner 会话和最小日记闭环；M2 第一片扩展月�
 - 两接口均要求有效会话、仅含当前 owner 未删除的日记，并返回 `Cache-Control: no-store`。月历计数直接按 `entry_date` 聚合，不按 UTC 创建时间重新分日。分页沿用 M1 的继续位置语义，不是数据库快照。
 - 日详情只含日记原文，不输出尚未实现的新闻、摘要或事件字段；没有新的写入接口或数据库迁移。
 
+## M2 第二片：归档搜索
+
+- `POST /search`：只读查询，JSON `{query:"",date_from:null,date_to:null,limit:20,cursor:null}`，返回 M1 的 `{items,next_cursor}`。字段可省略，必须至少有非空关键词或一个日期边界。未知字段拒绝；关键词去首尾空白后最多 200 字符，不能含 NUL；日期严格为 `YYYY-MM-DD`，起日不晚于止日；limit 为严格整数 1–100，cursor 最多 2048 字符。
+- 匹配当前 `content_md` 中的完整关键词子串，英文不区分大小写；中文无需分词。`%`、`_`、反斜杠、`/`、引号按字面匹配，不解释为通配符或 SQL。日期范围按 `entry_date`，包含两端。
+- 仅返回当前 owner 未删除的条目，按 `(entry_date,created_at,id)` 降序分页。独立的版本化游标绑定 owner、规范化关键词和日期条件的摘要；跨条件、跨 owner、日记/日期接口的游标及无效格式均通用 422。游标是继续位置，不是数据快照。
+- 要求有效会话、可信 Origin 与 `X-CSRF-Token`，所有响应 no-store。关键词和游标放请求体，不进 URL 或浏览器持久存储。此只读 POST 替代原先未实现的 GET 搜索草案，避免私密搜索词进入普通访问日志。
+- 不写日记、修订或搜索历史，不提供全文分词、相关性排序或语义检索。当前 PostgreSQL 字面子串查询没有大数据量索引性能保证。
+
 ## V1 全量资源规划
 
 This is the intended resource boundary, **not implemented endpoints**. Responses must be Pydantic typed, errors consistent, pagination stable, and permission checks applied at every record read and mutation.
@@ -43,7 +51,7 @@ This is the intended resource boundary, **not implemented endpoints**. Responses
 | GET | `/news/events` | searchable events |
 | GET | `/news/digests/{YYYY-MM-DD}` | daily digest and citations |
 | GET / POST / PATCH / DELETE | `/interests` | interest preferences |
-| GET | `/search` | keyword/date/tag search |
+| POST | `/search` | private keyword/date search; tag filtering deferred |
 | GET | `/jobs` | admin task status |
 | POST | `/jobs/{id}/retry` | authenticated manual re-run |
 | POST | `/exports` | start export |
