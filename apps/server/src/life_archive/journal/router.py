@@ -14,6 +14,7 @@ from life_archive.journal.models import Entry
 from life_archive.journal.schemas import (
     ArchiveDate,
     EntryCreate,
+    EntryOrder,
     EntryPage,
     EntryResponse,
     EntryRestore,
@@ -44,9 +45,16 @@ def list_page(
     cursor: Annotated[str | None, Query(max_length=1024)] = None,
     entry_date: ArchiveDate | None = None,
     tag_id: UUID | None = None,
+    order: EntryOrder = "date",
 ) -> EntryPage:
     return service.list_entries(
-        session, user.id, limit=limit, cursor=cursor, entry_date=entry_date, tag_id=tag_id
+        session,
+        user.id,
+        limit=limit,
+        cursor=cursor,
+        entry_date=entry_date,
+        tag_id=tag_id,
+        order=order,
     )
 
 

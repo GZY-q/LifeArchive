@@ -343,6 +343,7 @@ describe('journal workflow', () => {
                 entry_date: sampleEntry.entry_date,
                 changed_at: sampleEntry.updated_at,
                 editor_id: session.user.id,
+                is_pinned: false,
                 assets: [],
                 tags: [],
               },

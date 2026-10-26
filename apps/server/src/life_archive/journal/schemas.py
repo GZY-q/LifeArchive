@@ -3,7 +3,7 @@
 import re
 import unicodedata
 from datetime import date
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 from uuid import UUID
 
 from pydantic import (
@@ -12,6 +12,7 @@ from pydantic import (
     BeforeValidator,
     ConfigDict,
     Field,
+    StrictBool,
     field_validator,
     model_validator,
 )
@@ -22,6 +23,7 @@ Markdown = Annotated[str, Field(min_length=1, max_length=100_000)]
 RevisionNumber = Annotated[int, Field(strict=True, gt=0)]
 TagIds = Annotated[list[UUID], Field(max_length=20)]
 AssetIds = Annotated[list[UUID], Field(max_length=10)]
+EntryOrder = Literal["date", "pinned"]
 
 
 def normalize_tag_name(value: str) -> tuple[str, str]:
@@ -92,6 +94,7 @@ class EntryCreate(BaseModel):
     client_request_id: UUID | None = None
     tag_ids: TagIds = Field(default_factory=list)
     asset_ids: AssetIds = Field(default_factory=list)
+    is_pinned: StrictBool = False
 
     _unique_tags = field_validator("tag_ids")(unique_tag_ids)
     _unique_assets = field_validator("asset_ids")(unique_asset_ids)
@@ -114,6 +117,7 @@ class EntryUpdate(BaseModel):
     entry_date: ArchiveDate | None = None
     tag_ids: TagIds | None = None
     asset_ids: AssetIds | None = None
+    is_pinned: StrictBool | None = None
 
     _unique_tags = field_validator("tag_ids")(unique_tag_ids)
     _unique_assets = field_validator("asset_ids")(unique_asset_ids)
@@ -122,7 +126,7 @@ class EntryUpdate(BaseModel):
     def require_changes(self) -> Self:
         changed = self.model_fields_set - {"expected_revision"}
         if not changed:
-            raise ValueError("Provide content_md, entry_date, tag_ids or asset_ids to edit")
+            raise ValueError("Provide at least one editable journal field")
         if any(getattr(self, name) is None for name in changed):
             raise ValueError("Journal fields cannot be null")
         if self.content_md is not None and not self.content_md.strip():
@@ -145,6 +149,7 @@ class EntryResponse(BaseModel):
     updated_at: AwareDatetime
     tags: list[TagLabel]
     assets: list[AssetResponse]
+    is_pinned: bool
 
 
 class EntryRestore(BaseModel):
@@ -172,6 +177,7 @@ class RevisionResponse(BaseModel):
     editor_id: UUID
     tags: list[TagLabel]
     assets: list[AssetResponse]
+    is_pinned: bool
 
 
 class EntryPage(BaseModel):
@@ -192,3 +198,5 @@ class EntryCursor(BaseModel):
     id: UUID
     filter_date: date | None
     filter_tag_id: UUID | None = None
+    filter_order: EntryOrder = "date"
+    is_pinned: StrictBool = False

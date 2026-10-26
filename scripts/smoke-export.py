@@ -74,7 +74,7 @@ def main() -> None:
         assert output.stat().st_mode & 0o777 == 0o600
         with ZipFile(output) as archive:
             manifest = json.loads(archive.read("manifest.json"))
-            assert manifest["schema_version"] == 3
+            assert manifest["schema_version"] == 4
             assert manifest["deleted_policy"] == (
                 "include_deleted" if include_deleted else "active_only"
             )
@@ -96,6 +96,10 @@ def main() -> None:
                 data = archive.read(item["path"])
                 assert len(data) == item["bytes"]
                 assert hashlib.sha256(data).hexdigest() == item["sha256"]
+                if item["path"].startswith(("entries/", "revisions/")) and item["path"].endswith(
+                    ".json"
+                ):
+                    assert type(json.loads(data)["is_pinned"]) is bool
         unchanged = hashlib.sha256(output.read_bytes()).digest()
         refused = subprocess.run(arguments, capture_output=True, text=True, check=False)
         assert refused.returncode == 1 and refused.stdout == ""

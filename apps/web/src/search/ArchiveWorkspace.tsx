@@ -9,6 +9,7 @@ import { listTags } from '../api/tags';
 import type { Tag } from '../api/tags';
 import { TagBadges } from '../journal/TagBadges';
 import { AssetGallery } from '../journal/AssetGallery';
+import { PinnedBadge } from '../journal/PinnedBadge';
 import { readSearchForm } from './form';
 import type { SearchForm } from './form';
 
@@ -290,6 +291,7 @@ export function ArchiveWorkspace({
                 <time dateTime={entry.entry_date}>{entry.entry_date}</time>
                 {' · '}版本 {entry.revision}
               </p>
+              <PinnedBadge isPinned={entry.is_pinned} />
               <pre className="markdown-text">{entry.content_md}</pre>
               <TagBadges tags={entry.tags} />
               <AssetGallery assets={entry.assets} onExpired={onExpired} />

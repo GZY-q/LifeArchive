@@ -37,6 +37,7 @@ def create(
     *,
     tags: tuple[Tag, ...] = (),
     assets: tuple[Asset, ...] = (),
+    is_pinned: bool = False,
 ) -> Entry:
     entry, _ = create_entry(
         db,
@@ -47,6 +48,7 @@ def create(
             client_request_id=uuid4(),
             tag_ids=[tag.id for tag in tags],
             asset_ids=[asset.id for asset in assets],
+            is_pinned=is_pinned,
         ),
     )
     return entry
@@ -146,8 +148,8 @@ def test_raw_metadata_all_selected_revisions_and_deleted_policy_are_read_only(
     output = tmp_path / "archive.zip"
     result = exporter.export_journal(pg_engine, output, include_deleted=include_deleted)
     manifest, files = inspect_export(output)
-    assert manifest["schema_version"] == 3
-    assert manifest["alembic_revision"] == "0005_private_images"
+    assert manifest["schema_version"] == 4
+    assert manifest["alembic_revision"] == "0006_journal_pinning"
     catalog = json.loads(files["tags.json"])
     assert catalog == [
         {"id": str(tag.id), "name": tag.name, "created_at": tag.created_at.isoformat()}
@@ -181,6 +183,7 @@ def test_raw_metadata_all_selected_revisions_and_deleted_policy_are_read_only(
         "markdown_path",
         "tags",
         "assets",
+        "is_pinned",
     }
     assert current["id"] == str(entry.id) and current["user_id"] == str(journal_owner.id)
     assert current["client_request_id"] == str(original_request)
@@ -205,6 +208,7 @@ def test_raw_metadata_all_selected_revisions_and_deleted_policy_are_read_only(
             "markdown_path",
             "tags",
             "assets",
+            "is_pinned",
         }
         assert revision["entry_id"] == str(entry.id)
         assert revision["editor_id"] == str(journal_owner.id)
@@ -602,7 +606,7 @@ def test_images_export_selected_current_and_historical_originals_from_same_snaps
     active = tmp_path / "active-images.zip"
     exporter.export_journal(pg_engine, active)
     manifest, files = inspect_export(active)
-    assert raced and manifest["schema_version"] == 3 and manifest["asset_count"] == 2
+    assert raced and manifest["schema_version"] == 4 and manifest["asset_count"] == 2
     assert manifest["revision_count"] == 2
     catalog = json.loads(files["assets.json"])
     assert {row["id"] for row in catalog} == {str(first.id), str(current.id)}
@@ -625,6 +629,49 @@ def test_images_export_selected_current_and_historical_originals_from_same_snaps
         str(current.id),
         str(removed.id),
     }
+    assert database_rows(db_session) == before
+
+
+def test_pinning_export_keeps_current_history_and_deleted_snapshots_read_only(
+    pg_engine: Engine,
+    db_session: Session,
+    journal_owner: User,
+    tmp_path: Path,
+) -> None:
+    entry = create(db_session, journal_owner, is_pinned=True)
+    original_created = entry.created_at
+    for expected_revision, pinned in ((1, False), (2, True)):
+        edit_entry(
+            db_session,
+            journal_owner.id,
+            entry.id,
+            EntryUpdate(expected_revision=expected_revision, is_pinned=pinned),
+        )
+    delete_entry(db_session, journal_owner.id, entry.id, 3)
+    before = database_rows(db_session)
+    active = tmp_path / "active-pins.zip"
+    exporter.export_journal(pg_engine, active)
+    active_manifest, _ = inspect_export(active)
+    assert active_manifest["entry_count"] == active_manifest["revision_count"] == 0
+    output = tmp_path / "all-pins.zip"
+    exporter.export_journal(pg_engine, output, include_deleted=True)
+    manifest, files = inspect_export(output)
+    assert manifest["schema_version"] == 4
+    assert manifest["alembic_revision"] == "0006_journal_pinning"
+    assert (manifest["entry_count"], manifest["revision_count"], manifest["asset_count"]) == (
+        1,
+        4,
+        0,
+    )
+    current = json.loads(files[f"entries/{entry.id}.json"])
+    assert current["is_pinned"] is True and current["deleted_at"] is not None
+    assert current["created_at"] == original_created.isoformat()
+    assert current["entry_date"] == "2000-02-29"
+    assert files[f"entries/{entry.id}.md"] == RAW.encode("utf-8")
+    for number, pinned in enumerate((True, False, True, True), 1):
+        base = f"revisions/{entry.id}/{number}"
+        assert json.loads(files[base + ".json"])["is_pinned"] is pinned
+        assert files[base + ".md"] == RAW.encode("utf-8")
     assert database_rows(db_session) == before
 
 

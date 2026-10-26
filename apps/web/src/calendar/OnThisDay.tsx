@@ -5,6 +5,7 @@ import { errorMessage, isUnauthorized } from '../api/client';
 import type { Entry } from '../api/journal';
 import { TagBadges } from '../journal/TagBadges';
 import { AssetGallery } from '../journal/AssetGallery';
+import { PinnedBadge } from '../journal/PinnedBadge';
 
 type Props = {
   date: string;
@@ -124,6 +125,7 @@ function PastEntries({ date, disabled, onExpired }: Omit<Props, 'refresh'>) {
             <time dateTime={entry.entry_date}>{entry.entry_date}</time>
             {' · '}版本 {entry.revision}
           </p>
+          <PinnedBadge isPinned={entry.is_pinned} />
           <pre className="markdown-text">{entry.content_md}</pre>
           <TagBadges tags={entry.tags} />
           <AssetGallery assets={entry.assets} onExpired={onExpired} />

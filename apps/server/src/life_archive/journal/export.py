@@ -33,6 +33,7 @@ ENTRY_FIELDS = (
     "client_request_id",
     "tags",
     "assets",
+    "is_pinned",
 )
 REVISION_FIELDS = (
     "id",
@@ -43,6 +44,7 @@ REVISION_FIELDS = (
     "changed_at",
     "tags",
     "assets",
+    "is_pinned",
 )
 ASSET_FIELDS = ("id", "mime_type", "byte_size", "sha256", "width", "height", "created_at")
 ASSET_EXTENSIONS = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
@@ -217,7 +219,7 @@ def _write_snapshot(connection: Connection, archive: ZipFile, include_deleted: b
     files.append(_write_member(archive, "tags.json", _json_bytes([dict(tag) for tag in catalog])))
     files.extend(_write_assets(connection, archive, owner["id"], selected_assets))
     manifest: Manifest = {
-        "schema_version": 3,
+        "schema_version": 4,
         "exported_at": datetime.now(UTC),
         "alembic_revision": heads[0],
         "owner": dict(owner),

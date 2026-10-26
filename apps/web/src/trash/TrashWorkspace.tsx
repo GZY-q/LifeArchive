@@ -5,6 +5,7 @@ import { listTrash, restoreEntry } from '../api/trash';
 import type { TrashEntry } from '../api/trash';
 import { TagBadges } from '../journal/TagBadges';
 import { AssetGallery } from '../journal/AssetGallery';
+import { PinnedBadge } from '../journal/PinnedBadge';
 
 type Props = {
   csrfToken: string;
@@ -185,6 +186,7 @@ export function TrashWorkspace({
               }).format(new Date(entry.deleted_at))}
             </time>
           </p>
+          <PinnedBadge isPinned={entry.is_pinned} />
           <pre className="markdown-text">{entry.content_md}</pre>
           <TagBadges tags={entry.tags} />
           <AssetGallery assets={entry.assets} onExpired={onExpired} />

@@ -13,6 +13,7 @@ export const sampleEntry: Entry = {
   content_md: '# 原文\n\n今天的记录。  \n',
   entry_date: '2026-10-01',
   revision: 1,
+  is_pinned: false,
   created_at: '2026-10-02T03:00:00Z',
   updated_at: '2026-10-02T03:00:00Z',
   tags: [],

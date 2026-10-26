@@ -56,6 +56,8 @@ export LIFEARCHIVE_MEDIA_QUOTA_BYTES=1073741824
 
 后续检查发现首轮[自动CI 40251708989](https://github.com/GZY-q/LifeArchive/actions/runs/40251708989)的backend/frontend/compose通过，restore在创建目标媒体容器时失败：Compose `create`不支持`--no-deps`。已按本机Compose帮助修正为`--no-recreate --pull never`，创建停止态API和卷，同时保留已恢复PG；不再对create传不支持的选项。修正后的Docker恢复结果需以后续CI为准，不将初次失败记录为通过。
 
+修正提交`b2eef678a94b65e0f10dab61a634583458a08bba`的[CI 40266974089](https://github.com/GZY-q/LifeArchive/actions/runs/40266974089)已全部成功，含真实Docker数据库+原图恢复、鉴权读取/导出比较及损坏备份拒绝。此为11的合成数据验收，本机未追加完整演练，也不代表生产备份上线或后续置顶提交已验收。
+
 最小复核（PG配置私密注入TEST_POSTGRES_*）：
 
 ```bash
