@@ -13,6 +13,8 @@ type RequestOptions = {
   rawBody?: Blob;
   contentType?: string;
   responseType?: 'json' | 'blob';
+  accept?: string;
+  timeoutMs?: number;
   csrfToken?: string;
   signal?: AbortSignal;
 };
@@ -25,6 +27,8 @@ export async function request(
     rawBody,
     contentType,
     responseType = 'json',
+    accept,
+    timeoutMs = 15_000,
     csrfToken,
     signal,
   }: RequestOptions = {},
@@ -33,12 +37,13 @@ export async function request(
   const cancel = () => controller.abort();
   signal?.addEventListener('abort', cancel, { once: true });
   if (signal?.aborted) controller.abort();
-  const timer = window.setTimeout(cancel, 15_000);
+  const timer = window.setTimeout(cancel, timeoutMs);
   const headers: Record<string, string> = {
     Accept:
-      responseType === 'blob'
+      accept ??
+      (responseType === 'blob'
         ? 'image/jpeg, image/png, image/webp'
-        : 'application/json',
+        : 'application/json'),
   };
   if (method !== 'GET') headers['X-LifeArchive-Request'] = '1';
   if (body !== undefined) headers['Content-Type'] = 'application/json';

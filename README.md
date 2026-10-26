@@ -13,6 +13,7 @@ LifeArchive 是一个独立实现、单用户优先、自托管、面向几十�
 - 归档搜索支持中文/英文连续原文、日记日期范围、单标签组合条件与分页，也可只按标签查找；手动提交，条件只放请求体。当前采用字面子串匹配，尚未验证大规模全文索引性能。见 [10 工单](tasks/10-archive-tag-filter.md) 与 [交接](docs/archive-tag-filter-handoff.md)。
 - M2 第三片提供“往年这一天”：在日历选择日期并展开，分页查看以前年份同月同日的原文；闰日严格匹配，切换日期或刷新重新读取。
 - 提供只读日记导出 CLI：原始 Markdown、JSON 元数据、所选日记全部修订与 SHA-256 清单；可显式包含软删除记录，拒绝覆盖已有目标。
+- “导出”页可生成并下载同一 v4 ZIP，默认仅活动日记，可显式包含回收站；完整校验后才提供链接。网页导出有数量/32 MiB/时间上限，大档案继续用 CLI。见 [16工单](tasks/16-journal-export-ui.md) 与 [交接](docs/journal-export-ui-handoff.md)。
 - 提供隔离恢复演练脚本：新建合成源和空目标，验证 PG dump/restore、原文/修订/导出一致性和重启后读取；完整自动化加密备份仍待后续。
 - 日记标签提供私密目录、创建/勾选、随日记原子保存、修订快照和列表单标签筛选；导出保留标签目录与历史标签。范围和接手见 [08 工单](tasks/08-journal-tags.md) 与 [标签交接](docs/journal-tags-handoff.md)。
 - “标签”管理页支持改名，保留标签 ID 和日记关联，历史修订仍显示原名称；重名或并发修改先核对再提交。无迁移，见 [15工单](tasks/15-tag-renaming.md) 与 [改名交接](docs/tag-renaming-handoff.md)。
@@ -92,6 +93,8 @@ docker compose exec -T api alembic upgrade head
 修改 `.env` 密码不会修改已初始化数据卷内的数据库密码。不要为解决密码问题直接删除正式数据卷；需要单独规划数据库凭据变更。
 
 ### 可移植日记导出
+
+登录后打开主导航“导出”，选择是否包含回收站，点击“生成导出文件”，完成后点击“下载日记 ZIP”。包含所选日记全部修订及当前/历史引用原图；未保存草稿和未关联上传不包含。ZIP 未加密，离开页面会使临时下载链接失效。网页上限为 1,000 篇所选日记、5,000 条所选修订、2,000 个目录标签及 32 MiB ZIP；超限不会截断档案，请使用下面的 CLI。此入口无新配置或迁移。
 
 已有实例执行：
 
@@ -213,6 +216,7 @@ tasks/            严格按顺序执行的里程碑工单
 - `tasks/13-account-security.md` — 改密、旧会话撤销与草稿保留
 - `tasks/14-markdown-preview.md` — 原文保留、安全只读预览与链接/媒体边界
 - `tasks/15-tag-renaming.md` — 标签改名、名称冲突与历史快照保留
+- `tasks/16-journal-export-ui.md` — 有界网页 ZIP 下载、只读校验与草稿保护
 - `docs/next-steps.md` — 依赖顺序、验收状态与接手提示词
 - `docs/decisions.md` — 核心技术决策
 - `docs/m0-handoff.md` — M0 实现边界、代码入口和 M1 交接
@@ -235,6 +239,7 @@ tasks/            严格按顺序执行的里程碑工单
 - `docs/journal-trash-handoff.md` — 回收站实现、运行方式与后续入口
 - `docs/archive-tag-filter-handoff.md` — 归档标签条件、兼容约定和交接
 - `docs/journal-export-handoff.md` — 导出实现入口、错误边界和后续交接
+- `docs/journal-export-ui-handoff.md` — 网页导出范围、限额、运行与验收
 - `docs/journal-export-acceptance.md` — 导出实际验收证据
 
 - `docs/restore-rehearsal.md` — 恢复演练边界、运行和交接

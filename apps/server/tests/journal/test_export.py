@@ -272,13 +272,13 @@ def test_consistent_read_only_snapshot_survives_concurrent_edit_and_delete(
 
     original_snapshot = exporter._write_snapshot
 
-    def check_transaction(connection, archive, include_deleted):
+    def check_transaction(connection, archive, include_deleted, **options):
         assert (
             connection.exec_driver_sql("SHOW transaction_isolation").scalar_one()
             == "repeatable read"
         )
         assert connection.exec_driver_sql("SHOW transaction_read_only").scalar_one() == "on"
-        return original_snapshot(connection, archive, include_deleted)
+        return original_snapshot(connection, archive, include_deleted, **options)
 
     monkeypatch.setattr(ZipFile, "writestr", race)
     monkeypatch.setattr(exporter, "_write_snapshot", check_transaction)
