@@ -6,6 +6,7 @@ export type SearchFilters = {
   query: string;
   date_from: string | null;
   date_to: string | null;
+  tag_id?: string | null;
 };
 
 export async function searchEntries(

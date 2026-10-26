@@ -47,3 +47,5 @@ The daily digest **must retain its historical published version**; never silentl
 ## Text search
 
 PostgreSQL search first; evaluate Chinese segmentation and `pg_trgm` with actual test cases. pgvector is deferred and derived indexes must be rebuildable.
+
+Task 10 adds one optional current tag to private search without changing storage. Owner-scoped EntryTag EXISTS combines with literal content/date conditions using AND, avoiding duplicate pagination rows. Historical revision tags do not match current search; deleted entries stay excluded. The search-v1 digest adds a canonical tag UUID only when present, preserving existing no-tag cursors. There is no new index, migration or search-history write.

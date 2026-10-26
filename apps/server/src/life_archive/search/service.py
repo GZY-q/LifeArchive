@@ -13,7 +13,7 @@ from pydantic import ValidationError
 from sqlalchemy import select, tuple_
 from sqlalchemy.orm import Session
 
-from life_archive.journal.models import Entry
+from life_archive.journal.models import Entry, EntryTag
 from life_archive.journal.schemas import EntryPage, EntryResponse
 from life_archive.search.schemas import SearchCursor, SearchRequest
 
@@ -25,6 +25,9 @@ def _filter_digest(user_id: UUID, payload: SearchRequest) -> str:
         "date_from": payload.date_from.isoformat() if payload.date_from else None,
         "date_to": payload.date_to.isoformat() if payload.date_to else None,
     }
+    # Omitted/null tags retain the existing search-v1 digest for saved cursors.
+    if payload.tag_id is not None:
+        filters["tag_id"] = str(payload.tag_id)
     normalized = json.dumps(filters, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(normalized.encode()).hexdigest()
 
@@ -52,6 +55,16 @@ def search_entries(session: Session, user_id: UUID, payload: SearchRequest) -> E
         statement = statement.where(Entry.entry_date >= payload.date_from)
     if payload.date_to is not None:
         statement = statement.where(Entry.entry_date <= payload.date_to)
+    if payload.tag_id is not None:
+        statement = statement.where(
+            select(EntryTag.entry_id)
+            .where(
+                EntryTag.entry_id == Entry.id,
+                EntryTag.user_id == user_id,
+                EntryTag.tag_id == payload.tag_id,
+            )
+            .exists()
+        )
     if payload.cursor is not None:
         position = _decode_cursor(payload.cursor, digest)
         statement = statement.where(

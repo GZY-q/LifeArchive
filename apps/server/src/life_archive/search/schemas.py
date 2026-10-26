@@ -14,6 +14,7 @@ class SearchRequest(BaseModel):
     query: str = Field(default="", strict=True, max_length=200)
     date_from: ArchiveDate | None = None
     date_to: ArchiveDate | None = None
+    tag_id: UUID | None = None
     limit: int = Field(default=20, strict=True, ge=1, le=100)
     cursor: str | None = Field(default=None, strict=True, min_length=1, max_length=2048)
 
@@ -28,8 +29,13 @@ class SearchRequest(BaseModel):
 
     @model_validator(mode="after")
     def require_filters(self) -> Self:
-        if not self.query and self.date_from is None and self.date_to is None:
-            raise ValueError("Provide a search query or date bound")
+        if (
+            not self.query
+            and self.date_from is None
+            and self.date_to is None
+            and self.tag_id is None
+        ):
+            raise ValueError("Provide a search query, date bound or tag")
         if (
             self.date_from is not None
             and self.date_to is not None

@@ -24,7 +24,7 @@ M1 已实现 health、owner 会话和最小日记闭环；M2 已分片扩展月�
 - 名称请求长度 1–256，展示名去首尾空白并 NFC，唯一键 NFKC + casefold；规范化后均为 1–40 字符，不允许控制字符/换行/空名。
 - 日记 `tag_ids` 为至多 20 个不重复 UUID：创建省略视为 `[]`，PATCH 省略保持，`[]` 清空，null 拒绝；无权/不存在统一 422，整个日记写入回滚。
 - 当前/修订 `tags` 为按 UUID 升序的 `{id,name}[]`。历史保存名称快照；删除最终修订保留当时标签。标签不解析或改写 Markdown。
-- 本片没有标签改名/删除、层级、归档搜索标签条件或独立的日记标签写接口。
+- 没有标签改名/删除、层级或独立的日记标签写接口；归档搜索标签条件由10扩展，见下文。
 
 ## 09：回收站查看与恢复
 
@@ -44,11 +44,17 @@ M1 已实现 health、owner 会话和最小日记闭环；M2 已分片扩展月�
 
 ## M2 第二片：归档搜索
 
-- `POST /search`：只读查询，JSON `{query:"",date_from:null,date_to:null,limit:20,cursor:null}`，返回 M1 的 `{items,next_cursor}`。字段可省略，必须至少有非空关键词或一个日期边界。未知字段拒绝；关键词去首尾空白后最多 200 字符，不能含 NUL；日期严格为 `YYYY-MM-DD`，起日不晚于止日；limit 为严格整数 1–100，cursor 最多 2048 字符。
+- `POST /search`：只读查询，JSON `{query:"",date_from:null,date_to:null,tag_id:null,limit:20,cursor:null}`，返回 M1 的 `{items,next_cursor}`。字段可省略，必须至少有非空关键词、一个日期边界或单个标签。tag_id 为可选 UUID（省略/null等价）；未知字段拒绝。关键词去首尾空白后最多 200 字符，不能含 NUL；日期严格为 `YYYY-MM-DD`，起日不晚于止日；limit 为严格整数 1–100，cursor 最多 2048 字符。
 - 匹配当前 `content_md` 中的完整关键词子串，英文不区分大小写；中文无需分词。`%`、`_`、反斜杠、`/`、引号按字面匹配，不解释为通配符或 SQL。日期范围按 `entry_date`，包含两端。
-- 仅返回当前 owner 未删除的条目，按 `(entry_date,created_at,id)` 降序分页。独立的版本化游标绑定 owner、规范化关键词和日期条件的摘要；跨条件、跨 owner、日记/日期接口的游标及无效格式均通用 422。游标是继续位置，不是数据快照。
-- 要求有效会话、可信 Origin 与 `X-CSRF-Token`，所有响应 no-store。关键词和游标放请求体，不进 URL 或浏览器持久存储。此只读 POST 替代原先未实现的 GET 搜索草案，避免私密搜索词进入普通访问日志。
+- 仅返回当前 owner 未删除的条目，按 `(entry_date,created_at,id)` 降序分页。独立 `search-v1` 游标绑定 owner、规范化关键词、日期及非空标签的摘要；跨条件、跨 owner、其他接口游标及无效格式均通用 422。tag_id 省略/null时沿用旧摘要，旧无标签游标仍兼容；增加/移除/更换标签须重新搜索。游标是继续位置，不是数据快照。
+- 要求有效会话、可信 Origin 与 `X-CSRF-Token`，所有响应 no-store。关键词、日期、标签和游标放请求体，不进 URL 或浏览器持久存储。此只读 POST 替代原先未实现的 GET 搜索草案，避免私密搜索词进入普通访问日志。
 - 不写日记、修订或搜索历史，不提供全文分词、相关性排序或语义检索。当前 PostgreSQL 字面子串查询没有大数据量索引性能保证。
+
+### 10：归档标签条件
+
+单标签、关键词与日期为 AND；可以仅提交 tag_id。通过 owner 范围的当前 EntryTag EXISTS 过滤，不关联历史修订标签，不因多标签产生重复结果。未知/其他 owner 标签统一200空结果；无效 UUID 通用422。移除标签、软删除或恢复后的重新搜索反映当前状态。
+
+前端复用现有分页标签目录；加载失败独立重试，不阻塞无需标签的查询。选择标签只改表单，显式搜索才生成新的已提交条件；结果摘要、翻页和重试使用提交时标签，不受随后输入变化影响。切换视图保留内存表单，显式退出清空。没有新迁移、依赖或导出版本变化。
 
 ## M2 第三片：往年今日
 
@@ -79,7 +85,7 @@ This is the intended resource boundary, **not implemented endpoints**. Responses
 | GET | `/news/events` | searchable events |
 | GET | `/news/digests/{YYYY-MM-DD}` | daily digest and citations |
 | GET / POST / PATCH / DELETE | `/interests` | interest preferences |
-| POST | `/search` | private keyword/date search; tag filtering deferred |
+| POST | `/search` | private keyword/date/tag search with AND filters |
 | GET | `/jobs` | admin task status |
 | POST | `/jobs/{id}/retry` | authenticated manual re-run |
 | POST | `/exports` | start export |
