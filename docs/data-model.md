@@ -25,6 +25,8 @@ Task12 adds `0006_journal_pinning`: current and historical is_pinned default fal
 
 Task13 reuses User/AuthSession/LoginThrottle with no migration. Password change and session revocation reserve the existing shared attempt budget before acquiring the User lock. They refresh the locked owner, recheck the requesting session against the current database clock, verify the password, then commit the hash update (if any), old-session revocation, and new opaque session atomically. Login also holds the owner lock from fresh password verification through session commit to prevent stale authentication/rehash races. Revoked rows remain recorded; no plaintext credentials or original tokens are stored. Journal data and portable export are unaffected.
 
+Task14 adds only a derived client-side Markdown view. Rendered HTML/preview preferences are not stored, originals remain verbatim, and switching preview creates no revision or API write. Private asset metadata/bytes and export v4 are unchanged; there is no schema migration.
+
 ## News
 
 - `news_sources`: feed/API config, enabled, license notes.

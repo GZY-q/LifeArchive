@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+import { MarkdownContent } from '../components/MarkdownContent';
+
 import type { Entry } from '../api/journal';
 import { RevisionHistory } from './RevisionHistory';
 import { TagBadges } from './TagBadges';
@@ -34,7 +36,11 @@ export function EntryCard({
         <span className="small-note">版本 {entry.revision}</span>
       </div>
       <PinnedBadge isPinned={entry.is_pinned} />
-      <pre className="markdown-text">{entry.content_md}</pre>
+      <MarkdownContent
+        content={entry.content_md}
+        label={`${entry.entry_date} 日记原文与预览`}
+        disabled={disabled}
+      />
       <TagBadges tags={entry.tags} />
       <AssetGallery assets={entry.assets} onExpired={onExpired} />
       <div className="entry-actions">

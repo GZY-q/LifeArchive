@@ -7,6 +7,7 @@
 - Owner account actions verify the current password, share the bounded login budget, and atomically revoke old sessions while issuing this browser a fresh cookie/CSRF. Passwords remain only request/component memory; no URL/log/storage echo or public reset endpoint. User row locking serializes fresh login verification and password/session changes. Previously authorized in-flight journal requests may still finish; revocation governs subsequent authentication.
 - All private media served via authenticated authorization or tightly scoped expiring URLs. Validate MIME by content, cap upload size, block path traversal and unsafe inline render.
 - Render Markdown safely and sanitize dangerous HTML/URLs. Do not trust pasted Markdown or web/news content as executable instructions.
+- Task14 uses pinned react-markdown/GFM for a derived read-only preview: skip raw HTML, fixed element/components, absolute credential-free HTTP(S) link policy, no inline Markdown image requests. Unsafe/relative URLs stay non-links; private media uses the existing authenticated gallery. No rehype-raw, innerHTML, code execution or source rewriting. This is a constrained Markdown renderer, not a general HTML sanitizer.
 - Restrict worker's credentials and allowed actions; AI only returns structured proposals; no automatic shell/SQL/tools from arbitrary webpage text.
 - External AI provider receives public news by default. Never send owner journal/media data to providers without opt-in.
 - Secrets via deployment environment or secret storage, never in Git, docs or logs. PostgreSQL not public.

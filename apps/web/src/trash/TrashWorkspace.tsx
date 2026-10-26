@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { MarkdownContent } from '../components/MarkdownContent';
+
 import { ApiError, errorMessage, isUnauthorized } from '../api/client';
 import { listTrash, restoreEntry } from '../api/trash';
 import type { TrashEntry } from '../api/trash';
@@ -187,7 +189,11 @@ export function TrashWorkspace({
             </time>
           </p>
           <PinnedBadge isPinned={entry.is_pinned} />
-          <pre className="markdown-text">{entry.content_md}</pre>
+          <MarkdownContent
+            content={entry.content_md}
+            label={`${entry.entry_date} 已删除原文与预览`}
+            disabled={disabled || restoring !== null}
+          />
           <TagBadges tags={entry.tags} />
           <AssetGallery assets={entry.assets} onExpired={onExpired} />
           <div className="entry-actions">

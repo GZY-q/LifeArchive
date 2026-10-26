@@ -1,5 +1,7 @@
 # LifeArchive Web · 日记、标签与回收站
 
+安全Markdown预览复用`components/MarkdownPreview.tsx`/`MarkdownContent.tsx`：原文默认、支持CommonMark/GFM，忽略HTML、只允许绝对无凭据HTTP(S)链接、不创建Markdown img。草稿预览保持现textarea节点；图库继续鉴权读取。新增react-markdown10.1.0/remark-gfm4.0.1均精确锁定，未升级原包；见 [预览交接](../../docs/markdown-preview-handoff.md)。
+
 账号栏“账户”支持改密/退出其他会话，均验证当前密码；新Session接续同页草稿和后续CSRF。密码输入仅组件内存，提交结束/离开清空，网络不确定时跨导航禁重发，先重新验证或重登核对。不会自动操作账户；见 [账户交接](../../docs/account-security-handoff.md)。
 
 日记主列表支持置顶/取消与跨页优先展示，使用后端order=pinned与revision CAS；日期视图/归档继续原排序。置顶操作不重挂编辑器，草稿/图片/冻结UUID保留，冲突或不确定结果须刷新核对。见 [置顶交接](../../docs/journal-pinning-handoff.md)。

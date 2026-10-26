@@ -1078,3 +1078,16 @@ h2 {
   padding-top: 12px;
   border-top: 1px solid #e0e2d9;
 }
+
+.draft-preview-controls {
+  margin: 8px 0 12px;
+}
+
+.draft-preview {
+  min-width: 0;
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid #e0e2d9;
+  border-radius: 10px;
+  background: #fafbf6;
+}

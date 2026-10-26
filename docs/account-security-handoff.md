@@ -39,6 +39,8 @@ docker compose exec -T api alembic current
 
 未运行本机全量回归、镜像构建、浏览器、恢复或真机演练；当前功能CI由新PR自动触发，前序成功不替代本片结果。
 
+后续只读查询确认：提交`41276cf8ef46d4d6a6aa4f571ead1c72efe92623`的[CI 40323383358](https://github.com/GZY-q/LifeArchive/actions/runs/40323383358)已全部成功；本机未追加全量检查。此结果只属于13，不代表后续Markdown预览。
+
 最小复核（PG环境私密注入TEST_POSTGRES_*，缺配置skip不等于通过）：
 
 ```bash

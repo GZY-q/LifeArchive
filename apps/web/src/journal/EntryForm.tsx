@@ -6,6 +6,8 @@ import { createEntry, getEntry, updateEntry } from '../api/journal';
 import type { Entry } from '../api/journal';
 import type { Tag } from '../api/tags';
 import { MarkdownEditor } from '../components/MarkdownEditor';
+import { MarkdownContent } from '../components/MarkdownContent';
+import { MarkdownPreview } from '../components/MarkdownPreview';
 import type { Draft } from './draft';
 import { TagBadges } from './TagBadges';
 import { TagPicker } from './TagPicker';
@@ -47,6 +49,7 @@ export function EntryForm({
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [composing, setComposing] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [error, setError] = useState('');
   const [conflict, setConflict] = useState(false);
   const [latest, setLatest] = useState<Entry | null>(null);
@@ -180,6 +183,27 @@ export function EntryForm({
         <p id="journal-content-hint" className="small-note">
           Markdown 原文 · 仅保存在当前页面，保存后才写入档案。
         </p>
+        <div className="draft-preview-controls">
+          <button
+            type="button"
+            className="text-button"
+            disabled={disabled || busy || uploading || composing}
+            aria-expanded={previewOpen}
+            aria-controls="journal-draft-preview"
+            onClick={() => setPreviewOpen((open) => !open)}
+          >
+            {previewOpen ? '收起预览' : '预览草稿'}
+          </button>
+        </div>
+        {previewOpen && (
+          <section
+            id="journal-draft-preview"
+            className="draft-preview"
+            aria-label="草稿预览"
+          >
+            <MarkdownPreview content={draft.content_md} />
+          </section>
+        )}
         <TagPicker
           tags={tags}
           selected={draft.tag_ids}
@@ -237,7 +261,11 @@ export function EntryForm({
                   服务器版本 {latest.revision} · {latest.entry_date}
                 </h3>
                 <PinnedBadge isPinned={latest.is_pinned} />
-                <pre className="markdown-text">{latest.content_md}</pre>
+                <MarkdownContent
+                  content={latest.content_md}
+                  label="服务器最新版本原文与预览"
+                  disabled={disabled || busy || uploading || composing}
+                />
                 <TagBadges tags={latest.tags} />
                 <AssetGallery assets={latest.assets} onExpired={onExpired} />
                 <button

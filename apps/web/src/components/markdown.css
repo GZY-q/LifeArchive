@@ -1,0 +1,106 @@
+.markdown-content,
+.markdown-preview {
+  min-width: 0;
+}
+
+.markdown-display-toggle {
+  margin-bottom: 10px;
+}
+
+.markdown-preview {
+  overflow-wrap: anywhere;
+  line-height: 1.8;
+}
+
+.markdown-preview > :first-child {
+  margin-top: 0;
+}
+
+.markdown-preview > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-preview h1,
+.markdown-preview h2,
+.markdown-preview h3,
+.markdown-preview h4,
+.markdown-preview h5,
+.markdown-preview h6 {
+  margin: 1em 0 0.5em;
+  line-height: 1.4;
+}
+
+.markdown-preview h1 {
+  font-size: 1.65em;
+}
+.markdown-preview h2 {
+  font-size: 1.4em;
+}
+.markdown-preview h3 {
+  font-size: 1.2em;
+}
+.markdown-preview h4,
+.markdown-preview h5,
+.markdown-preview h6 {
+  font-size: 1em;
+}
+
+.markdown-preview blockquote {
+  margin: 1em 0;
+  border-left: 3px solid #a6b79e;
+  padding-left: 16px;
+  color: #5b6557;
+}
+
+.markdown-preview pre {
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: #f0f2e9;
+  padding: 14px;
+  white-space: pre;
+}
+
+.markdown-preview code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.9em;
+}
+
+.markdown-preview :not(pre) > code {
+  border-radius: 3px;
+  background: #f0f2e9;
+  padding: 2px 4px;
+}
+
+.markdown-preview table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.markdown-preview th,
+.markdown-preview td {
+  border: 1px solid #dce1d4;
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.markdown-preview th {
+  background: #f0f2e9;
+}
+.markdown-preview a {
+  color: #3e5a35;
+  text-decoration: underline;
+}
+.markdown-preview .contains-task-list {
+  list-style: none;
+  padding-left: 1em;
+}
+.markdown-preview input[type='checkbox'] {
+  margin-right: 8px;
+}
+.markdown-image-placeholder {
+  color: #687161;
+  font-size: 0.9em;
+}
