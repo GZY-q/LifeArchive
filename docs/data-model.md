@@ -7,16 +7,19 @@ Schema is a **design draft**, not an applied migration. Codex should implement t
 - `users(id, username, password_hash, timezone, created_at, ...)`
 - `sessions` or a robust secure-session equivalent; do not store plain tokens.
 - `entries(id, user_id, content_md, entry_date DATE, occurred_at TIMESTAMPTZ NULL, occurred_timezone TEXT NULL, created_at TIMESTAMPTZ, updated_at TIMESTAMPTZ, deleted_at TIMESTAMPTZ NULL, revision INT, client_request_id UUID NULL)`
-- `entry_revisions(id, entry_id, revision, content_md, entry_date, changed_at, editor_id, tags JSONB)`
+- `entry_revisions(id, entry_id, revision, content_md, entry_date, changed_at, editor_id, tags JSONB, assets JSONB)`
 - `tags(id, user_id, name, name_key, created_at)`; unique `(user_id,name_key)`.
 - `entry_tags(entry_id, tag_id, user_id)`; primary key `(entry_id,tag_id)` and composite owner foreign keys to entries/tags.
-- `assets(id, owner_id, sha256, mime_type, byte_size, storage_key, created_at)`, `entry_assets`.
+- `assets(id, user_id, sha256, mime_type, byte_size, width, height, storage_key, created_at)`; unique `(user_id,sha256)` and `(id,user_id)`.
+- `entry_assets(entry_id,asset_id,user_id)`; composite owner foreign keys, primary key `(entry_id,asset_id)`.
 
 `entries.entry_date` is a calendar label chosen by user, not always the UTC date of `created_at`. Unique `(user_id, client_request_id)` where client id is non-null; real FK and indexes should be used. Revision must increment with optimistic version checks. Soft delete and permanent purge require explicit semantics for revisions, assets and indexes.
 
 Task 08 applies tags with `0004_entry_tags`. Names use trimmed NFC for display and NFKC + casefold for owner-scoped uniqueness. An entry has at most 20 tags. Tags and journal fields share one revision/CAS transaction; immutable revision `tags` stores UUID/name snapshots, sorted by UUID. Existing revisions receive `[]`. Tag IDs do not alter raw Markdown. Creation replay compares revision 1's tag-ID set alongside the original text/date. Tag rename/delete and tag hierarchies remain deferred.
 
 Task 09 reuses these tables without a migration. Restore atomically matches owner, non-null `deleted_at`, and expected revision; clears deletion, increments revision, updates the UTC modification instant, and saves an immutable content/date/tag snapshot. IDs, creation request UUIDs, original dates, occurrence metadata, and historical revisions survive delete/restore cycles. Repeated or stale restore requests conflict; no permanent purge exists. The recycle-bin cursor orders by `(deleted_at DESC,id DESC)` and binds owner separately from journal cursors. No performance guarantee for large recycle bins is made yet.
+
+Task 11 applies `0005_private_images`, adds the asset tables and `entry_revisions.assets JSONB` (old snapshots `[]`). Current/revision asset metadata contains public ID, MIME, byte count, SHA-256, dimensions and UTC creation instant; private storage keys never enter API/export metadata. Images are immutable original files under UUID-hex keys in a private volume. Entries reference at most ten owner assets; association changes share the journal CAS/transaction and creation replay compares revision 1's asset-ID set. Detaching/soft deleting never destroys history or media. Per-owner row locking serializes content-hash deduplication and registered-byte quota checks. Files become durable before DB metadata commits; failed writes can retain unregistered files, never overwrite existing originals. Metadata and private file volume must be backed up together.
 
 ## News
 

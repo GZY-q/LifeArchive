@@ -9,6 +9,8 @@ import { MarkdownEditor } from '../components/MarkdownEditor';
 import type { Draft } from './draft';
 import { TagBadges } from './TagBadges';
 import { TagPicker } from './TagPicker';
+import { AssetGallery } from './AssetGallery';
+import { AssetPicker } from './AssetPicker';
 
 type Props = {
   draft: Draft;
@@ -42,17 +44,25 @@ export function EntryForm({
   onTagsRetry,
 }: Props) {
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [composing, setComposing] = useState(false);
   const [error, setError] = useState('');
   const [conflict, setConflict] = useState(false);
   const [latest, setLatest] = useState<Entry | null>(null);
   const [loadingLatest, setLoadingLatest] = useState(false);
   const editing = draft.original !== null;
-  const locked = disabled || busy || draft.pendingCreate !== null;
+  const locked = disabled || busy || uploading || draft.pendingCreate !== null;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || disabled || composing || conflict || !draft.content_md.trim())
+    if (
+      busy ||
+      disabled ||
+      uploading ||
+      composing ||
+      conflict ||
+      !draft.content_md.trim()
+    )
       return;
     setBusy(true);
     onBusy(true);
@@ -65,6 +75,7 @@ export function EntryForm({
             content_md: draft.content_md,
             entry_date: draft.entry_date,
             tag_ids: draft.tag_ids,
+            asset_ids: draft.asset_ids,
             expected_revision: draft.original.revision,
           },
           csrfToken,
@@ -74,6 +85,7 @@ export function EntryForm({
           content_md: draft.content_md,
           entry_date: draft.entry_date,
           tag_ids: [...draft.tag_ids],
+          asset_ids: [...draft.asset_ids],
           client_request_id: crypto.randomUUID(),
         };
         onDraft({ ...draft, pendingCreate: input });
@@ -181,6 +193,23 @@ export function EntryForm({
           onExpired={onExpired}
           onBusy={onBusy}
         />
+        <AssetPicker
+          assets={draft.attachments}
+          csrfToken={csrfToken}
+          disabled={locked}
+          onChange={(attachments) =>
+            onDraft({
+              ...draft,
+              attachments,
+              asset_ids: attachments.map((asset) => asset.id),
+            })
+          }
+          onExpired={onExpired}
+          onBusy={(value) => {
+            setUploading(value);
+            onBusy(value);
+          }}
+        />
         {error && (
           <p className="error-message" role="alert">
             {error}
@@ -208,6 +237,7 @@ export function EntryForm({
                 </h3>
                 <pre className="markdown-text">{latest.content_md}</pre>
                 <TagBadges tags={latest.tags} />
+                <AssetGallery assets={latest.assets} onExpired={onExpired} />
                 <button
                   type="button"
                   className="secondary-button"
@@ -237,6 +267,7 @@ export function EntryForm({
             type="submit"
             disabled={
               busy ||
+              uploading ||
               disabled ||
               composing ||
               conflict ||

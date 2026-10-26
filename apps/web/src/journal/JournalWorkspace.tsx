@@ -155,6 +155,8 @@ export function JournalWorkspace({
             content_md: entry.content_md,
             entry_date: entry.entry_date,
             tag_ids: entry.tags.map((tag) => tag.id),
+            asset_ids: entry.assets.map((asset) => asset.id),
+            attachments: entry.assets,
             original: entry,
             pendingCreate: null,
           }

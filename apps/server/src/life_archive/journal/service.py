@@ -22,6 +22,8 @@ from life_archive.journal.schemas import (
     RevisionPage,
     RevisionResponse,
 )
+from life_archive.media.models import Asset, EntryAsset
+from life_archive.media.schemas import AssetResponse
 
 
 def _not_found() -> HTTPException:
@@ -44,6 +46,9 @@ def get_entry(session: Session, user_id: UUID, entry_id: UUID) -> Entry:
 
 
 def _snapshot(session: Session, entry: Entry, editor_id: UUID) -> None:
+    # A successful CAS holds the row lock; re-read associations even when this
+    # Session had cached a version from before another committed edit.
+    session.expire(entry, ["tags", "assets"])
     session.add(
         EntryRevision(
             entry_id=entry.id,
@@ -53,6 +58,10 @@ def _snapshot(session: Session, entry: Entry, editor_id: UUID) -> None:
             revision=entry.revision,
             changed_at=entry.updated_at,
             tags=[{"id": str(tag.id), "name": tag.name} for tag in entry.tags],
+            assets=[
+                AssetResponse.model_validate(asset).model_dump(mode="json")
+                for asset in entry.assets
+            ],
         )
     )
 
@@ -75,6 +84,7 @@ def _replay(session: Session, entry: Entry, payload: EntryCreate) -> tuple[Entry
         original.content_md != payload.content_md
         or original.entry_date != payload.entry_date
         or {UUID(tag["id"]) for tag in original.tags} != set(payload.tag_ids)
+        or {UUID(asset["id"]) for asset in original.assets} != set(payload.asset_ids)
     ):
         raise _conflict(
             "idempotency_conflict", "This request ID was already used for a different journal entry"
@@ -107,6 +117,33 @@ def _replace_tags(session: Session, entry: Entry, tag_ids: list[UUID]) -> None:
     session.expire(entry, ["tags"])
 
 
+def _validate_assets(session: Session, user_id: UUID, asset_ids: list[UUID]) -> None:
+    if not asset_ids:
+        return
+    found = set(
+        session.scalars(select(Asset.id).where(Asset.user_id == user_id, Asset.id.in_(asset_ids)))
+    )
+    if found != set(asset_ids):
+        raise HTTPException(status_code=422, detail="One or more images are unavailable")
+
+
+def _replace_assets(session: Session, entry: Entry, asset_ids: list[UUID]) -> None:
+    session.execute(
+        delete(EntryAsset).where(
+            EntryAsset.entry_id == entry.id, EntryAsset.user_id == entry.user_id
+        )
+    )
+    if asset_ids:
+        session.execute(
+            insert(EntryAsset),
+            [
+                {"entry_id": entry.id, "asset_id": asset_id, "user_id": entry.user_id}
+                for asset_id in asset_ids
+            ],
+        )
+    session.expire(entry, ["assets"])
+
+
 def create_entry(session: Session, user_id: UUID, payload: EntryCreate) -> tuple[Entry, bool]:
     if payload.client_request_id is not None:
         existing = _find_request(session, user_id, payload.client_request_id)
@@ -125,9 +162,11 @@ def create_entry(session: Session, user_id: UUID, payload: EntryCreate) -> tuple
     )
     try:
         _validate_tags(session, user_id, payload.tag_ids)
+        _validate_assets(session, user_id, payload.asset_ids)
         session.add(entry)
         session.flush()  # Obtain its ID before adding the foreign-key snapshot.
         _replace_tags(session, entry, payload.tag_ids)
+        _replace_assets(session, entry, payload.asset_ids)
         _snapshot(session, entry, user_id)
         session.commit()
     except IntegrityError:
@@ -151,7 +190,9 @@ def _failed_compare_and_swap(session: Session, user_id: UUID, entry_id: UUID) ->
 
 
 def edit_entry(session: Session, user_id: UUID, entry_id: UUID, payload: EntryUpdate) -> Entry:
-    changes = payload.model_dump(exclude_unset=True, exclude={"expected_revision", "tag_ids"})
+    changes = payload.model_dump(
+        exclude_unset=True, exclude={"expected_revision", "tag_ids", "asset_ids"}
+    )
     try:
         entry = session.scalar(
             update(Entry)
@@ -170,6 +211,9 @@ def edit_entry(session: Session, user_id: UUID, entry_id: UUID, payload: EntryUp
         if payload.tag_ids is not None:
             _validate_tags(session, user_id, payload.tag_ids)
             _replace_tags(session, entry, payload.tag_ids)
+        if payload.asset_ids is not None:
+            _validate_assets(session, user_id, payload.asset_ids)
+            _replace_assets(session, entry, payload.asset_ids)
         _snapshot(session, entry, user_id)
         session.commit()
     except Exception:

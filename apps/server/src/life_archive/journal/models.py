@@ -20,6 +20,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from life_archive.db import Base
+from life_archive.media.models import Asset, EntryAsset
 
 
 class Tag(Base):
@@ -86,6 +87,18 @@ class Entry(Base):
         viewonly=True,
         lazy="selectin",
     )
+    assets: Mapped[list[Asset]] = relationship(
+        secondary=EntryAsset.__table__,
+        primaryjoin=lambda: and_(
+            Entry.id == EntryAsset.entry_id, Entry.user_id == EntryAsset.user_id
+        ),
+        secondaryjoin=lambda: and_(
+            Asset.id == EntryAsset.asset_id, Asset.user_id == EntryAsset.user_id
+        ),
+        order_by=lambda: Asset.id,
+        viewonly=True,
+        lazy="selectin",
+    )
 
 
 Index(
@@ -112,5 +125,8 @@ class EntryRevision(Base):
     revision: Mapped[int] = mapped_column(nullable=False)
     changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     tags: Mapped[list[dict[str, str]]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
+    )
+    assets: Mapped[list[dict[str, object]]] = mapped_column(
         JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
     )

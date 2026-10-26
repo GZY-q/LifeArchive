@@ -12,6 +12,8 @@ x-backend: &backend
     LIFEARCHIVE_LOG_LEVEL: ${LIFEARCHIVE_LOG_LEVEL:-INFO}
     LIFEARCHIVE_COOKIE_SECURE: ${LIFEARCHIVE_COOKIE_SECURE:-true}
     LIFEARCHIVE_TRUSTED_ORIGINS: '${LIFEARCHIVE_TRUSTED_ORIGINS:-["http://127.0.0.1:8080","http://127.0.0.1:5173"]}'
+    LIFEARCHIVE_MEDIA_ROOT: /var/lib/lifearchive/media
+    LIFEARCHIVE_MEDIA_QUOTA_BYTES: ${LIFEARCHIVE_MEDIA_QUOTA_BYTES:-1073741824}
   init: true
   security_opt:
     - no-new-privileges:true
@@ -43,6 +45,8 @@ services:
   api:
     <<: *backend
     command: ["uvicorn", "life_archive.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-server-header"]
+    volumes:
+      - media:/var/lib/lifearchive/media
     depends_on:
       postgres:
         condition: service_healthy
@@ -61,6 +65,8 @@ services:
     <<: *backend
     profiles: ["worker"]
     command: ["python", "-m", "life_archive.worker"]
+    volumes:
+      - media:/var/lib/lifearchive/media:ro
     networks:
       - database
     restart: "no"
@@ -91,3 +97,4 @@ networks:
 
 volumes:
   pgdata:
+  media:

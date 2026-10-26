@@ -18,6 +18,7 @@ htmlcov/
 build/
 data/
 backups/
+private-media/
 *.dump
 *.sql
 *.log

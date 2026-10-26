@@ -1,4 +1,5 @@
 import hashlib
+import io
 import json
 import os
 from datetime import UTC, date, datetime, timedelta, timezone
@@ -8,6 +9,7 @@ from uuid import uuid4
 from zipfile import ZipFile
 
 import pytest
+from PIL import Image
 from sqlalchemy import create_engine, insert, select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -20,6 +22,9 @@ from life_archive.journal.models import Entry, EntryRevision, EntryTag, Tag
 from life_archive.journal.schemas import EntryCreate, EntryUpdate, TagCreate
 from life_archive.journal.service import create_entry, delete_entry, edit_entry
 from life_archive.journal.tags import create_tag
+from life_archive.media.models import Asset, EntryAsset
+from life_archive.media.service import create_asset
+from life_archive.settings import get_media_settings
 
 RAW = "  # 中文 /../ 标题 😀\r\n\r\n<script>private()</script>  \n组合字 e\u0301\n"
 
@@ -31,6 +36,7 @@ def create(
     day: str = "2000-02-29",
     *,
     tags: tuple[Tag, ...] = (),
+    assets: tuple[Asset, ...] = (),
 ) -> Entry:
     entry, _ = create_entry(
         db,
@@ -40,6 +46,7 @@ def create(
             entry_date=day,
             client_request_id=uuid4(),
             tag_ids=[tag.id for tag in tags],
+            asset_ids=[asset.id for asset in assets],
         ),
     )
     return entry
@@ -72,7 +79,17 @@ def database_rows(db: Session) -> dict:
         model.__tablename__: db.execute(
             select(model.__table__).order_by(*model.__table__.primary_key.columns)
         ).all()
-        for model in (User, Entry, EntryRevision, Tag, EntryTag, AuthSession, LoginThrottle)
+        for model in (
+            User,
+            Entry,
+            EntryRevision,
+            Tag,
+            EntryTag,
+            Asset,
+            EntryAsset,
+            AuthSession,
+            LoginThrottle,
+        )
     }
 
 
@@ -129,8 +146,8 @@ def test_raw_metadata_all_selected_revisions_and_deleted_policy_are_read_only(
     output = tmp_path / "archive.zip"
     result = exporter.export_journal(pg_engine, output, include_deleted=include_deleted)
     manifest, files = inspect_export(output)
-    assert manifest["schema_version"] == 2
-    assert manifest["alembic_revision"] == "0004_entry_tags"
+    assert manifest["schema_version"] == 3
+    assert manifest["alembic_revision"] == "0005_private_images"
     catalog = json.loads(files["tags.json"])
     assert catalog == [
         {"id": str(tag.id), "name": tag.name, "created_at": tag.created_at.isoformat()}
@@ -163,6 +180,7 @@ def test_raw_metadata_all_selected_revisions_and_deleted_policy_are_read_only(
         "client_request_id",
         "markdown_path",
         "tags",
+        "assets",
     }
     assert current["id"] == str(entry.id) and current["user_id"] == str(journal_owner.id)
     assert current["client_request_id"] == str(original_request)
@@ -186,6 +204,7 @@ def test_raw_metadata_all_selected_revisions_and_deleted_policy_are_read_only(
             "changed_at",
             "markdown_path",
             "tags",
+            "assets",
         }
         assert revision["entry_id"] == str(entry.id)
         assert revision["editor_id"] == str(journal_owner.id)
@@ -292,7 +311,7 @@ def test_empty_archive_and_repeated_exports_have_stable_data_files(
     exporter.export_journal(pg_engine, empty)
     manifest, files = inspect_export(empty)
     assert manifest["entry_count"] == manifest["revision_count"] == 0
-    assert files == {"tags.json": b"[]\n"}
+    assert files == {"tags.json": b"[]\n", "assets.json": b"[]\n"}
     create(db_session, journal_owner)
     outputs = [tmp_path / "one.zip", tmp_path / "two.zip"]
     for path in outputs:
@@ -341,7 +360,7 @@ def test_export_streams_more_than_one_batch_of_entries_and_revisions(
     exporter.export_journal(pg_engine, output)
     manifest, files = inspect_export(output)
     assert manifest["entry_count"] == 103 and manifest["revision_count"] == 203
-    assert len(files) == (103 + 203) * 2 + 1
+    assert len(files) == (103 + 203) * 2 + 2
     for row in entries:
         assert files[f"entries/{row['id']}.md"] == row["content_md"].encode()
     for row in revisions:
@@ -533,3 +552,108 @@ def test_configuration_failure_and_parser_errors_do_not_expose_secrets(
         with pytest.raises(SystemExit) as error:
             cli.main(arguments)
         assert error.value.code == 2
+
+
+def image(db: Session, owner: User, color: str) -> tuple[Asset, bytes]:
+    buffer = io.BytesIO()
+    Image.new("RGB", (2, 2), color).save(buffer, format="PNG")
+    original = buffer.getvalue()
+    return create_asset(db, owner.id, original, "image/png")[0], original
+
+
+def test_images_export_selected_current_and_historical_originals_from_same_snapshot(
+    pg_engine: Engine,
+    db_session: Session,
+    journal_owner: User,
+    session_factory: sessionmaker[Session],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first, first_bytes = image(db_session, journal_owner, "red")
+    current, current_bytes = image(db_session, journal_owner, "blue")
+    removed, _ = image(db_session, journal_owner, "green")
+    unused, _ = image(db_session, journal_owner, "gray")
+    entry = create(db_session, journal_owner, assets=(first,))
+    edit_entry(
+        db_session,
+        journal_owner.id,
+        entry.id,
+        EntryUpdate(expected_revision=1, asset_ids=[current.id]),
+    )
+    deleted = create(db_session, journal_owner, "软删除图片", assets=(removed,))
+    delete_entry(db_session, journal_owner.id, deleted.id, 1)
+    original_write = ZipFile.writestr
+    raced = False
+
+    def race(archive, info, data, *args, **kwargs):
+        nonlocal raced
+        if not raced and info.filename.startswith("entries/"):
+            raced = True
+            with session_factory() as writer:
+                edit_entry(
+                    writer,
+                    journal_owner.id,
+                    entry.id,
+                    EntryUpdate(expected_revision=2, asset_ids=[]),
+                )
+        return original_write(archive, info, data, *args, **kwargs)
+
+    monkeypatch.setattr(ZipFile, "writestr", race)
+    active = tmp_path / "active-images.zip"
+    exporter.export_journal(pg_engine, active)
+    manifest, files = inspect_export(active)
+    assert raced and manifest["schema_version"] == 3 and manifest["asset_count"] == 2
+    assert manifest["revision_count"] == 2
+    catalog = json.loads(files["assets.json"])
+    assert {row["id"] for row in catalog} == {str(first.id), str(current.id)}
+    assert {row["id"] for row in catalog}.isdisjoint({str(removed.id), str(unused.id)})
+    assert files[f"assets/{first.id}.png"] == first_bytes
+    assert files[f"assets/{current.id}.png"] == current_bytes
+    assert json.loads(files[f"entries/{entry.id}.json"])["assets"][0]["id"] == str(current.id)
+    assert json.loads(files[f"revisions/{entry.id}/1.json"])["assets"][0]["id"] == str(first.id)
+    for row in catalog:
+        assert set(row) == set(exporter.ASSET_FIELDS) | {"file_path"}
+        assert row["sha256"] == hashlib.sha256(files[row["file_path"]]).hexdigest()
+    monkeypatch.setattr(ZipFile, "writestr", original_write)
+    before = database_rows(db_session)
+    included = tmp_path / "deleted-images.zip"
+    exporter.export_journal(pg_engine, included, include_deleted=True)
+    with_deleted, data = inspect_export(included)
+    assert with_deleted["asset_count"] == 3
+    assert {row["id"] for row in json.loads(data["assets.json"])} == {
+        str(first.id),
+        str(current.id),
+        str(removed.id),
+    }
+    assert database_rows(db_session) == before
+
+
+def test_missing_or_corrupt_referenced_image_fails_export_without_success(
+    pg_engine: Engine,
+    db_session: Session,
+    journal_owner: User,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    asset, original = image(db_session, journal_owner, "red")
+    create(db_session, journal_owner, assets=(asset,))
+    stored = get_media_settings().media_root / asset.storage_key
+    before = database_rows(db_session)
+    # Rename preserves the fixture original while exercising a missing registered file.
+    retained = stored.with_suffix(".retained")
+    stored.rename(retained)
+    missing = tmp_path / "missing-image.zip"
+    with pytest.raises(exporter.ExportError, match="missing or corrupt"):
+        exporter.export_journal(pg_engine, missing)
+    stored.write_bytes(b"corrupt original")
+    monkeypatch.setattr(cli, "get_engine", lambda: pg_engine)
+    broken = tmp_path / "corrupt-image.zip"
+    assert cli.main(["export-journal", "--output", str(broken)]) == 1
+    capture = capsys.readouterr()
+    assert capture.out == "" and "missing or corrupt" in capture.err
+    assert str(stored) not in capture.err and retained.read_bytes() == original
+    assert database_rows(db_session) == before
+    for path in (missing, broken):
+        with ZipFile(path) as archive:
+            assert "manifest.json" not in archive.namelist()

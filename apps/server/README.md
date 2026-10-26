@@ -1,6 +1,6 @@
 # LifeArchive API 与只读日记导出
 
-当前实现 health、单一 owner CLI、Argon2id 登录、可撤销会话/CSRF/限流，以及有版本和创建幂等保护的日记 CRUD。M2 提供月历、日期详情、私密归档搜索和往年今日。`GET /api/v1/on-this-day` 按参考日期读取以前年份同月同日的当前活动原文；省略日期时按 owner 时区确定今天，闰日不映射到相邻日期。搜索通过 `POST /api/v1/search` 的 JSON 请求体接收关键词和日期范围，使用转义的绑定参数做字面子串匹配，不写原文/修订或搜索历史。管理 CLI 另提供原文/元数据/完整所选修订的 ZIP 导出，使用独立只读快照、0600 排他目标和写后哈希复核。没有新闻、AI、媒体或任务调度器。完整运行和验证见根 README、`docs/journal-export-handoff.md`、`docs/export-format.md`。
+当前提供owner认证、日记CRUD/标签/回收站、月历/日期/往年今日和私密搜索，以及静态图片原文件上传/鉴权读取/日记关联与修订。搜索条件仅放POST体；导出v3使用只读快照、0600排他ZIP和写后哈希核验，包含所选日记当前/历史原图。没有新闻、AI或调度器。运行见根README、`docs/private-images-handoff.md`与`docs/export-format.md`。
 
 ## 开发与检查
 
@@ -30,6 +30,7 @@ Python 固定为 `.python-version` 的 3.12.14，uv 固定为 `pyproject.toml` �
 | `src/life_archive/journal/` | owner 范围读写、原子修订、标签、回收站/恢复、分页与创建请求去重 |
 | `src/life_archive/timeline/` | owner 范围月历、日期详情和往年今日；后者在 on_this_day.py 使用独立绑定游标 |
 | `src/life_archive/search/` | owner 范围原文/日期/单标签只读搜索、JSON 校验和条件摘要游标 |
+| `src/life_archive/media/` | Pillow13内容验证、owner配额/哈希去重、私有原文件、鉴权读取 |
 | `src/life_archive/cli.py` | 唯一 owner 初始化（密码 getpass / stdin）与 export-journal 脱敏分发 |
 | `src/life_archive/journal/export.py` | 只读快照、批量原文/修订、私密排他 ZIP 和完整校验 |
 | `src/life_archive/settings.py` | Pydantic 配置；普通应用配置和 DB 密钥分别延迟读取 |
@@ -65,8 +66,8 @@ docker compose exec -T api alembic upgrade head
 docker compose exec -T api alembic current
 ```
 
-新增 ORM 模型时继承 `Base`，在 `alembic/env.py` 中导入模型，再生成并审查新迁移。当前 head 为 `0004_entry_tags`，新增标签与关联，旧修订标签回填 `[]`。不要修改已应用的迁移；不要一次创建设计文档中的全部未来表。单元测试中的 SQLite 仅验证基础 Session 行为，业务、并发和迁移用真实 PostgreSQL。
+新增ORM模型继承Base并注册Alembic。当前head为`0005_private_images`，新增assets/entry_assets和修订assets JSONB，旧快照回填[]；不要修改已应用迁移或直接回滚含数据迁移。图片依赖私有目录，原文件保留0600；Pillow13已锁版本，没有multipart依赖。SQLite只验证基础Session，业务/并发/迁移使用真实PostgreSQL。
 
-当前范围还包括 `tasks/08-journal-tags.md`、`tasks/09-journal-trash.md` 和 `tasks/10-archive-tag-filter.md`：私密标签、历史和列表筛选、导出 v2、回收站与原子恢复，以及归档单标签与原文/日期的AND条件。标签/回收站位于 journal 模块，没有独立服务。09/10没有新增迁移，head仍0004_entry_tags。后续仅执行明确分配的工单。当前搜索未增加全文索引，不承诺大规模数据性能。继续保持 API 与 worker 入口独立；worker 使用 `python -m life_archive.worker`，没有调度器、业务任务或常驻循环。
+当前范围追加`tasks/11-private-images.md`。本机开发显式设置`LIFEARCHIVE_MEDIA_ROOT`为工作区外私密绝对目录；容器固定`/var/lib/lifearchive/media`并挂media卷。默认已登记图片总配额1GiB，可用`LIFEARCHIVE_MEDIA_QUOTA_BYTES`调整，单图5MiB/2000万像素上限固定。不要只备份PG而遗漏原文件；没有资产永久删除/GC。当前搜索未加全文索引，不承诺大规模性能；API/worker入口独立，worker仍无调度器。
 
 实现依据：[SQLAlchemy URL](https://docs.sqlalchemy.org/en/20/core/engines.html#creating-urls-programmatically)、[Session 生命周期](https://docs.sqlalchemy.org/en/20/orm/session_basics.html)、[Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)、[Alembic 教程](https://alembic.sqlalchemy.org/en/latest/tutorial.html)、[uv 容器部署](https://docs.astral.sh/uv/guides/integration/docker/)。

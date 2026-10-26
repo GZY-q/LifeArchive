@@ -8,6 +8,7 @@ import type { SearchFilters } from '../api/search';
 import { listTags } from '../api/tags';
 import type { Tag } from '../api/tags';
 import { TagBadges } from '../journal/TagBadges';
+import { AssetGallery } from '../journal/AssetGallery';
 import { readSearchForm } from './form';
 import type { SearchForm } from './form';
 
@@ -291,6 +292,7 @@ export function ArchiveWorkspace({
               </p>
               <pre className="markdown-text">{entry.content_md}</pre>
               <TagBadges tags={entry.tags} />
+              <AssetGallery assets={entry.assets} onExpired={onExpired} />
             </article>
           ))}
           {cursor && !requestError && (

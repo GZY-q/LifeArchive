@@ -10,28 +10,46 @@ export class ApiError extends Error {
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   body?: unknown;
+  rawBody?: Blob;
+  contentType?: string;
+  responseType?: 'json' | 'blob';
   csrfToken?: string;
   signal?: AbortSignal;
 };
 
 export async function request(
   path: string,
-  { method = 'GET', body, csrfToken, signal }: RequestOptions = {},
+  {
+    method = 'GET',
+    body,
+    rawBody,
+    contentType,
+    responseType = 'json',
+    csrfToken,
+    signal,
+  }: RequestOptions = {},
 ): Promise<unknown> {
   const controller = new AbortController();
   const cancel = () => controller.abort();
   signal?.addEventListener('abort', cancel, { once: true });
   if (signal?.aborted) controller.abort();
   const timer = window.setTimeout(cancel, 15_000);
-  const headers: Record<string, string> = { Accept: 'application/json' };
+  const headers: Record<string, string> = {
+    Accept:
+      responseType === 'blob'
+        ? 'image/jpeg, image/png, image/webp'
+        : 'application/json',
+  };
   if (method !== 'GET') headers['X-LifeArchive-Request'] = '1';
   if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (rawBody !== undefined && contentType)
+    headers['Content-Type'] = contentType;
   if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
 
   try {
     const response = await fetch(`/api/v1${path}`, {
       method,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: rawBody ?? (body === undefined ? undefined : JSON.stringify(body)),
       headers,
       credentials: 'same-origin',
       cache: 'no-store',
@@ -54,6 +72,7 @@ export async function request(
       throw new ApiError(response.status, code);
     }
     if (response.status === 204) return undefined;
+    if (responseType === 'blob') return await response.blob();
     return await response.json();
   } catch (error) {
     if (error instanceof ApiError) throw error;

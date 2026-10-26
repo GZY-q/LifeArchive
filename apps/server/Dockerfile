@@ -21,7 +21,10 @@ ENV PATH="/app/.venv/bin:$PATH" \
 WORKDIR /app
 
 RUN groupadd --gid 10001 life_archive \
-    && useradd --uid 10001 --gid life_archive --no-create-home life_archive
+    && useradd --uid 10001 --gid life_archive --no-create-home life_archive \
+    && mkdir -p /var/lib/lifearchive/media \
+    && chown 10001:10001 /var/lib/lifearchive/media \
+    && chmod 0700 /var/lib/lifearchive/media
 
 COPY --from=builder /app/.venv ./.venv
 COPY apps/server/alembic.ini ./alembic.ini

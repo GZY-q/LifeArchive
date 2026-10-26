@@ -1,6 +1,8 @@
 import { invalidResponse, isRecord, request } from './client';
 import { tagLabelsFrom } from './tags';
 import type { TagLabel } from './tags';
+import { assetsFrom } from './assets';
+import type { Asset } from './assets';
 
 export type Entry = {
   id: string;
@@ -10,16 +12,18 @@ export type Entry = {
   created_at: string;
   updated_at: string;
   tags: TagLabel[];
+  assets: Asset[];
 };
 export type EntryRevision = Pick<
   Entry,
-  'content_md' | 'entry_date' | 'revision' | 'tags'
+  'content_md' | 'entry_date' | 'revision' | 'tags' | 'assets'
 > & {
   changed_at: string;
   editor_id: string;
 };
 export type EntryInput = Pick<Entry, 'content_md' | 'entry_date'> & {
   tag_ids: string[];
+  asset_ids: string[];
 };
 export type CreateInput = EntryInput & { client_request_id: string };
 
@@ -35,7 +39,11 @@ export function entryFrom(value: unknown): Entry {
     typeof value.updated_at !== 'string'
   )
     return invalidResponse();
-  return { ...value, tags: tagLabelsFrom(value.tags) } as Entry;
+  return {
+    ...value,
+    tags: tagLabelsFrom(value.tags),
+    assets: assetsFrom(value.assets),
+  } as Entry;
 }
 
 export async function listEntries(
@@ -120,7 +128,11 @@ export async function listRevisions(
       typeof item.editor_id !== 'string'
     )
       return invalidResponse();
-    return { ...item, tags: tagLabelsFrom(item.tags) } as EntryRevision;
+    return {
+      ...item,
+      tags: tagLabelsFrom(item.tags),
+      assets: assetsFrom(item.assets),
+    } as EntryRevision;
   });
   return { items, next_cursor: value.next_cursor as number | null };
 }

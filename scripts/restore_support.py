@@ -188,7 +188,12 @@ class Docker:
             config["volumes"]["pgdata"]["name"] == stack.project + "_pgdata",
             "Unexpected database volume",
         )
-        for resource in (config["volumes"]["pgdata"], *config["networks"].values()):
+        require(
+            set(config["volumes"]) == {"pgdata", "media"}
+            and config["volumes"]["media"]["name"] == stack.project + "_media",
+            "Unexpected private media volume",
+        )
+        for resource in (*config["volumes"].values(), *config["networks"].values()):
             require(
                 not resource.get("external")
                 and resource.get("labels", {}).get(LABEL) == self.run_id,
@@ -233,7 +238,27 @@ class Docker:
             require(
                 Path(services[name]["build"]["context"]) == self.repo, "Unexpected build context"
             )
+        for name, read_only in (("api", False), ("worker", True)):
+            mounts = services[name].get("volumes", [])
+            require(
+                len(mounts) == 1
+                and mounts[0]["type"] == "volume"
+                and mounts[0]["source"] == "media"
+                and mounts[0]["target"] == "/var/lib/lifearchive/media"
+                and bool(mounts[0].get("read_only")) is read_only,
+                "Unexpected private media mount",
+            )
+            require(
+                services[name]["environment"].get("LIFEARCHIVE_MEDIA_ROOT")
+                == "/var/lib/lifearchive/media",
+                "Unexpected private media root",
+            )
         return config
+
+    def owned_media(self, stack: Stack) -> str:
+        name = stack.project + "_media"
+        self.check_labels(self.inspect("volume", name).get("Labels"), stack)
+        return name
 
     def start(self, stack: Stack, *, database_only: bool = False, build: bool = False) -> None:
         self.preflight(stack)

@@ -4,6 +4,7 @@ import { getDay } from '../api/calendar';
 import { errorMessage, isUnauthorized } from '../api/client';
 import type { Entry } from '../api/journal';
 import { TagBadges } from '../journal/TagBadges';
+import { AssetGallery } from '../journal/AssetGallery';
 
 type Props = { date: string; disabled: boolean; onExpired: () => void };
 
@@ -79,6 +80,7 @@ export function DayEntries({ date, disabled, onExpired }: Props) {
           <p className="small-note">版本 {entry.revision}</p>
           <pre className="markdown-text">{entry.content_md}</pre>
           <TagBadges tags={entry.tags} />
+          <AssetGallery assets={entry.assets} onExpired={onExpired} />
         </article>
       ))}
       {busy && (

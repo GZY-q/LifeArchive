@@ -16,6 +16,7 @@
 **/*.tsbuildinfo
 data
 backups
+**/private-media
 *.dump
 *.sql
 *.log

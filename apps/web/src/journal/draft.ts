@@ -1,8 +1,10 @@
 import type { CreateInput, Entry, EntryInput } from '../api/journal';
+import type { Asset } from '../api/assets';
 
 export type Draft = EntryInput & {
   original: Entry | null;
   pendingCreate: CreateInput | null;
+  attachments: Asset[];
 };
 
 export function todayIn(timezone: string): string {
@@ -22,6 +24,8 @@ export function emptyDraft(timezone: string): Draft {
     content_md: '',
     entry_date: todayIn(timezone),
     tag_ids: [],
+    asset_ids: [],
+    attachments: [],
     original: null,
     pendingCreate: null,
   };
@@ -31,10 +35,19 @@ export function hasUnsavedDraft(draft: Draft | null): boolean {
   if (!draft) return false;
   if (draft.pendingCreate) return true;
   if (!draft.original)
-    return draft.content_md.length > 0 || draft.tag_ids.length > 0;
+    return (
+      draft.content_md.length > 0 ||
+      draft.tag_ids.length > 0 ||
+      draft.asset_ids.length > 0
+    );
   return (
     draft.content_md !== draft.original.content_md ||
     draft.entry_date !== draft.original.entry_date ||
+    [...draft.asset_ids].sort().join(',') !==
+      draft.original.assets
+        .map((asset) => asset.id)
+        .sort()
+        .join(',') ||
     [...draft.tag_ids].sort().join(',') !==
       draft.original.tags
         .map((tag) => tag.id)

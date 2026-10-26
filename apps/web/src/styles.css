@@ -563,6 +563,65 @@ textarea:focus-visible {
   white-space: nowrap;
 }
 
+.asset-picker {
+  min-width: 0;
+  margin: 20px 0;
+  padding: 16px;
+  border: 1px solid #dce1d5;
+  border-radius: 8px;
+}
+
+.asset-picker legend {
+  padding: 0 6px;
+  font-weight: 600;
+}
+
+.asset-picker input[type='file'] {
+  display: block;
+  width: 100%;
+  margin: 10px 0;
+}
+
+.asset-selection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.asset-gallery {
+  margin: 12px 0;
+}
+
+.asset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.asset-preview {
+  min-width: 0;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid #e0e4da;
+  border-radius: 6px;
+}
+
+.asset-preview img {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  height: auto;
+  object-fit: contain;
+}
+
+.asset-preview figcaption {
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+
 .workspace-navigation {
   display: flex;
   gap: 8px;

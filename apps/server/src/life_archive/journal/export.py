@@ -17,6 +17,8 @@ from sqlalchemy.engine import Connection, Engine
 
 from life_archive.auth.models import User
 from life_archive.journal.models import Entry, EntryRevision, EntryTag, Tag
+from life_archive.media.models import Asset, EntryAsset
+from life_archive.media.storage import MediaStorageError, read_original
 
 ENTRY_FIELDS = (
     "id",
@@ -30,8 +32,20 @@ ENTRY_FIELDS = (
     "revision",
     "client_request_id",
     "tags",
+    "assets",
 )
-REVISION_FIELDS = ("id", "entry_id", "editor_id", "revision", "entry_date", "changed_at", "tags")
+REVISION_FIELDS = (
+    "id",
+    "entry_id",
+    "editor_id",
+    "revision",
+    "entry_date",
+    "changed_at",
+    "tags",
+    "assets",
+)
+ASSET_FIELDS = ("id", "mime_type", "byte_size", "sha256", "width", "height", "created_at")
+ASSET_EXTENSIONS = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
 
 
 class ExportError(Exception):
@@ -52,6 +66,7 @@ class Manifest(TypedDict):
     deleted_policy: Literal["active_only", "include_deleted"]
     entry_count: int
     revision_count: int
+    asset_count: int
     files: list[FileRecord]
 
 
@@ -104,6 +119,43 @@ def _write_record(
     ]
 
 
+def _referenced_assets(labels: object) -> set[UUID]:
+    if not isinstance(labels, list):
+        raise ExportError("Invalid source asset metadata")
+    try:
+        return {UUID(str(label["id"])) for label in labels}
+    except (ValueError, TypeError, KeyError):
+        raise ExportError("Invalid source asset metadata") from None
+
+
+def _write_assets(
+    connection: Connection, archive: ZipFile, owner_id: UUID, selected: set[UUID]
+) -> list[FileRecord]:
+    files: list[FileRecord] = []
+    catalog = []
+    # Only assets referenced by the selected current records or their revisions
+    # are portable members. Unassociated uploads remain in database/media backups.
+    for asset_id in sorted(selected):
+        asset = (
+            connection.execute(
+                select(Asset.__table__).where(Asset.id == asset_id, Asset.user_id == owner_id)
+            )
+            .mappings()
+            .one_or_none()
+        )
+        if asset is None or asset["mime_type"] not in ASSET_EXTENSIONS:
+            raise ExportError("Referenced asset metadata is unavailable")
+        try:
+            original = read_original(asset)
+        except MediaStorageError:
+            raise ExportError("Referenced original media is missing or corrupt") from None
+        path = f"assets/{asset_id}.{ASSET_EXTENSIONS[asset['mime_type']]}"
+        files.append(_write_member(archive, path, original))
+        catalog.append({**{field: asset[field] for field in ASSET_FIELDS}, "file_path": path})
+    files.append(_write_member(archive, "assets.json", _json_bytes(catalog)))
+    return files
+
+
 def _write_snapshot(connection: Connection, archive: ZipFile, include_deleted: bool) -> Manifest:
     heads = MigrationContext.configure(connection).get_current_heads()
     if len(heads) != 1:
@@ -120,6 +172,7 @@ def _write_snapshot(connection: Connection, archive: ZipFile, include_deleted: b
         entries = entries.where(Entry.deleted_at.is_(None))
     files: list[FileRecord] = []
     entry_count = revision_count = 0
+    selected_assets: set[UUID] = set()
     # Core rows avoid an ORM identity map retaining all journal originals.
     with connection.execute(entries.order_by(Entry.id).execution_options(yield_per=100)) as rows:
         for entry in rows.mappings():
@@ -131,6 +184,17 @@ def _write_snapshot(connection: Connection, archive: ZipFile, include_deleted: b
             ).mappings()
             current = dict(entry)
             current["tags"] = [dict(tag) for tag in tags]
+            assets = connection.execute(
+                select(*(getattr(Asset, field) for field in ASSET_FIELDS))
+                .join(
+                    EntryAsset,
+                    (EntryAsset.asset_id == Asset.id) & (EntryAsset.user_id == Asset.user_id),
+                )
+                .where(EntryAsset.entry_id == entry["id"], Asset.user_id == owner["id"])
+                .order_by(Asset.id)
+            ).mappings()
+            current["assets"] = [dict(asset) for asset in assets]
+            selected_assets.update(_referenced_assets(current["assets"]))
             files.extend(_write_record(archive, f"entries/{entry['id']}", current, ENTRY_FIELDS))
             entry_count += 1
             revisions = (
@@ -141,6 +205,7 @@ def _write_snapshot(connection: Connection, archive: ZipFile, include_deleted: b
             )
             with connection.execute(revisions) as history:
                 for revision in history.mappings():
+                    selected_assets.update(_referenced_assets(revision["assets"]))
                     base = f"revisions/{entry['id']}/{revision['revision']}"
                     files.extend(_write_record(archive, base, revision, REVISION_FIELDS))
                     revision_count += 1
@@ -150,14 +215,16 @@ def _write_snapshot(connection: Connection, archive: ZipFile, include_deleted: b
         select(Tag.id, Tag.name, Tag.created_at).where(Tag.user_id == owner["id"]).order_by(Tag.id)
     ).mappings()
     files.append(_write_member(archive, "tags.json", _json_bytes([dict(tag) for tag in catalog])))
+    files.extend(_write_assets(connection, archive, owner["id"], selected_assets))
     manifest: Manifest = {
-        "schema_version": 2,
+        "schema_version": 3,
         "exported_at": datetime.now(UTC),
         "alembic_revision": heads[0],
         "owner": dict(owner),
         "deleted_policy": "include_deleted" if include_deleted else "active_only",
         "entry_count": entry_count,
         "revision_count": revision_count,
+        "asset_count": len(selected_assets),
         "files": sorted(files, key=lambda item: item["path"]),
     }
     # Last member: its presence alone still does not replace full hash verification.

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { Entry } from '../api/journal';
 import { RevisionHistory } from './RevisionHistory';
 import { TagBadges } from './TagBadges';
+import { AssetGallery } from './AssetGallery';
 
 export function EntryCard({
   entry,
@@ -29,6 +30,7 @@ export function EntryCard({
       </div>
       <pre className="markdown-text">{entry.content_md}</pre>
       <TagBadges tags={entry.tags} />
+      <AssetGallery assets={entry.assets} onExpired={onExpired} />
       <div className="entry-actions">
         <button
           type="button"

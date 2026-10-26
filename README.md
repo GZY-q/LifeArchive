@@ -12,9 +12,10 @@ LifeArchive 是一个独立实现、单用户优先、自托管、面向几十�
 - M2 第三片提供“往年这一天”：在日历选择日期并展开，分页查看以前年份同月同日的原文；闰日严格匹配，切换日期或刷新重新读取。
 - 提供只读日记导出 CLI：原始 Markdown、JSON 元数据、所选日记全部修订与 SHA-256 清单；可显式包含软删除记录，拒绝覆盖已有目标。
 - 提供隔离恢复演练脚本：新建合成源和空目标，验证 PG dump/restore、原文/修订/导出一致性和重启后读取；完整自动化加密备份仍待后续。
-- 日记标签提供私密目录、创建/勾选、随日记原子保存、修订快照和列表单标签筛选；导出 v2 保留标签目录与历史标签。范围和接手见 [08 工单](tasks/08-journal-tags.md) 与 [标签交接](docs/journal-tags-handoff.md)。
+- 日记标签提供私密目录、创建/勾选、随日记原子保存、修订快照和列表单标签筛选；导出保留标签目录与历史标签。范围和接手见 [08 工单](tasks/08-journal-tags.md) 与 [标签交接](docs/journal-tags-handoff.md)。
 - 回收站支持分页查看软删除日记和逐篇恢复；保留原文、标签、原 ID 与历史，恢复创建新修订并检查并发版本。没有永久清除功能，见 [09 工单](tasks/09-journal-trash.md) 与 [交接](docs/journal-trash-handoff.md)。
-- 编辑器通过独立适配层使用原生 Markdown 文本域；07 的真实输入法验收正在进行，协议、环境和自动化审查已准备，完整真机矩阵仍待证据。详见 [兼容矩阵](docs/editor-compatibility.md) 与 [验收接手](docs/editor-validation-handoff.md)。媒体、新闻、AI 与完整备份恢复尚未实现。
+- 私密图片附件支持静态JPEG/PNG/WebP原图上传、日记关联和历史、登录后查看/下载；原文件保存在私有media卷，导出v3包含所选当前/历史引用原图。大小/配额/恢复边界见 [11工单](tasks/11-private-images.md) 和 [图片交接](docs/private-images-handoff.md)。
+- 编辑器通过独立适配层使用原生 Markdown 文本域；07 的真实输入法验收正在进行，协议、环境和自动化审查已准备，完整真机矩阵仍待证据。详见 [兼容矩阵](docs/editor-compatibility.md) 与 [验收接手](docs/editor-validation-handoff.md)。新闻、AI 与完整生产备份恢复尚未实现。
 - 最新运行与限制见 [恢复演练交接](docs/restore-rehearsal.md) 和 [验收记录](docs/restore-acceptance.md)；下一步按 [实施与接手计划](docs/next-steps.md) 逐片推进。月历见 [M2 第一片](docs/m2-handoff.md)；认证和日记约定见 [M1 交接](docs/m1-handoff.md)。历史检查保留在 [M1](docs/m1-acceptance.md) / [M0](docs/m0-acceptance.md) 验收记录。
 - 所有设计取舍以 `docs/architecture.md`、`docs/product.md` 和 `docs/data-model.md` 为准。发生冲突时，先在 PR 中指出差异，不要静默改动核心约束。
 
@@ -72,7 +73,7 @@ docker compose exec -T api alembic upgrade head
 docker compose --profile worker run --rm --no-deps worker
 ```
 
-Worker 与 API 共享后端镜像，最后一条命令仅记录“尚未配置任务”后成功退出；日记不依赖 worker 或 LLM。迁移链为 `0001_foundation` → `0002_owner_sessions` → `0003_journal` → `0004_entry_tags`，升级可重复执行。新增 owner、会话、限流、日记、修订和标签表；0004 为旧修订补空标签快照，保留原文。不要直接回滚含日记数据的迁移；先制定备份/恢复方案。
+Worker 与 API 共享后端镜像，最后一条命令仅记录“尚未配置任务”后成功退出；日记不依赖 worker 或 LLM。迁移链为 `0001_foundation` → `0002_owner_sessions` → `0003_journal` → `0004_entry_tags` → `0005_private_images`，升级可重复执行。0004/0005为旧修订补空标签/图片快照，保留原文。API读写私有media卷，worker只读，web不挂载；完整备份须包含数据库与原文件。不要直接回滚含数据的迁移。
 
 **重置测试数据（破坏性操作，仅在确认测试卷可丢弃后手动执行）：**
 
@@ -96,7 +97,7 @@ docker compose exec -T api python -m life_archive.cli export-journal --output /t
 
 默认导出活动日记及其全部修订；用新路径并加 `--include-deleted` 可包含软删除日记。目标必须为绝对路径、父目录已存在；文件以 0600 排他创建，已有文件、目录和符号链接均拒绝。导出通过同一只读一致性快照读取数据，关闭 ZIP 后逐文件复核清单和 SHA-256。
 
-成功 stdout 只有路径和条目/修订数，失败非零退出并保留可能的私密残留；重试需选新路径。复制到宿主、独立核验命令、格式及退出码见 [导出格式](docs/export-format.md)。文件含私密原文且未加密；v2 包含标签目录和标签历史，排除认证和媒体。它提供独立阅读能力，整库恢复与自动备份仍需后续验收。
+成功 stdout 只有路径和条目/修订数，失败非零退出并保留可能的私密残留；重试需选新路径。复制到宿主、独立核验命令、格式及退出码见 [导出格式](docs/export-format.md)。v3含私密原文、标签与所选日记当前/历史原图，文件未加密，排除认证及未关联上传；整库与原文件卷备份仍须保留，生产自动备份待后续。
 
 ### 本机开发与检查
 
@@ -203,6 +204,7 @@ tasks/            严格按顺序执行的里程碑工单
 - `tasks/08-journal-tags.md` — 日记标签、列表筛选、标签历史及导出 v2
 - `tasks/09-journal-trash.md` — 回收站查看、原子恢复与草稿保护
 - `tasks/10-archive-tag-filter.md` — 归档标签组合条件与私密分页
+- `tasks/11-private-images.md` — 私密原图、日记关联、历史与导出v3
 - `docs/next-steps.md` — 依赖顺序、验收状态与接手提示词
 - `docs/decisions.md` — 核心技术决策
 - `docs/m0-handoff.md` — M0 实现边界、代码入口和 M1 交接
@@ -216,7 +218,8 @@ tasks/            严格按顺序执行的里程碑工单
 - `docs/m2-on-this-day-handoff.md` — 往年今日契约、实现入口和运行命令
 - `docs/m2-on-this-day-acceptance.md` — 往年今日实际验收证据
 
-- `docs/export-format.md` — 可移植格式 v2、v1 阅读说明及独立哈希核验
+- `docs/export-format.md` — 可移植格式v3、v1/v2阅读说明及独立哈希核验
+- `docs/private-images-handoff.md` — 图片存储、权限、迁移、配置与交接
 - `docs/journal-tags-handoff.md` — 标签实现、必要检查结果与后续入口
 - `docs/journal-trash-handoff.md` — 回收站实现、运行方式与后续入口
 - `docs/archive-tag-filter-handoff.md` — 归档标签条件、兼容约定和交接
