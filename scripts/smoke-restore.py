@@ -139,7 +139,9 @@ def restore_media(docker: Docker, source: Stack, target: Stack, directory: Path)
     private_write(directory / "synthetic-media.json", encoded)
     # Create a stopped API container so Compose initializes the media volume
     # with the runtime UID; verify ownership before the helper writes any bytes.
-    docker.command(target, "create", "--no-build", "--no-deps", "api")
+    # `create` has no --no-deps option. Keep the restored PG container intact
+    # while creating the stopped API container and its private media volume.
+    docker.command(target, "create", "--no-build", "--no-recreate", "--pull", "never", "api")
     require(docker.owned_media(target) != docker.owned_media(source), "Media volumes overlap")
     container_id = docker.command(target, "ps", "--all", "--quiet", "api").decode().strip()
     container = docker.inspect("container", container_id)
