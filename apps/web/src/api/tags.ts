@@ -53,3 +53,18 @@ export async function createTag(name: string, csrfToken: string): Promise<Tag> {
     await request('/tags', { method: 'POST', body: { name }, csrfToken }),
   );
 }
+
+export async function renameTag(
+  id: string,
+  name: string,
+  expectedName: string,
+  csrfToken: string,
+): Promise<Tag> {
+  return tagFrom(
+    await request(`/tags/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: { name, expected_name: expectedName },
+      csrfToken,
+    }),
+  );
+}

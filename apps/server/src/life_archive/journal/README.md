@@ -34,7 +34,14 @@ already started a read transaction. Originals and snapshots commit together.
   by UUID, with limit 1–200. `POST /tags {name}` returns 201, or the existing
   normalized-name match with 200. Names use trimmed NFC for display and
   NFKC+casefold for uniqueness; both normalized lengths are 1–40. Control
-  characters and line breaks are rejected. Tags have no rename/delete endpoint.
+  characters and line breaks are rejected. `PATCH /tags/{id} {name,expected_name}`
+  locks the owner row, compares the exact prior name, and updates only its name/key.
+  Stale names return `tag_conflict`; owner-scoped unique-name collisions return
+  `tag_name_taken` (both 409); unknown/other-owner IDs return 404. PATCH additionally
+  requires the shared trusted-Origin/JSON/custom-header check. IDs, creation instants,
+  journal versions, associations and old name snapshots survive renaming; creation
+  replay uses IDs. A name comparison cannot detect a later rename back to the same
+  name (ABA); no monotonic catalogue version is introduced. No delete endpoint exists.
 - Entry and revision responses include `tags: [{id,name}]`, ordered by UUID.
   Current associations have database-enforced owner consistency. Unknown and
   unauthorized tag IDs receive the same generic 422 response on writes.

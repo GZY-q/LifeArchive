@@ -55,7 +55,8 @@ export function JournalWorkspace({
     const controller = new AbortController();
     void listTags(controller.signal)
       .then((items) => {
-        if (!controller.signal.aborted)
+        if (!controller.signal.aborted) {
+          setTagsError('');
           setTags((current) =>
             [
               ...items,
@@ -64,6 +65,7 @@ export function JournalWorkspace({
               ),
             ].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN')),
           );
+        }
       })
       .catch((cause: unknown) => {
         if (controller.signal.aborted) return;
@@ -74,7 +76,7 @@ export function JournalWorkspace({
         if (!controller.signal.aborted) setTagsLoading(false);
       });
     return () => controller.abort();
-  }, [tagsRefresh, onExpired]);
+  }, [tagsRefresh, onExpired, refreshVersion]);
 
   useEffect(() => {
     const controller = new AbortController();

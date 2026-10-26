@@ -8,6 +8,7 @@
 - All private media served via authenticated authorization or tightly scoped expiring URLs. Validate MIME by content, cap upload size, block path traversal and unsafe inline render.
 - Render Markdown safely and sanitize dangerous HTML/URLs. Do not trust pasted Markdown or web/news content as executable instructions.
 - Task14 uses pinned react-markdown/GFM for a derived read-only preview: skip raw HTML, fixed element/components, absolute credential-free HTTP(S) link policy, no inline Markdown image requests. Unsafe/relative URLs stay non-links; private media uses the existing authenticated gallery. No rehype-raw, innerHTML, code execution or source rewriting. This is a constrained Markdown renderer, not a general HTML sanitizer.
+- Task15 renames only owner-scoped tags with existing Origin/JSON/CSRF checks. Exact expected-name comparison under a row lock and the normalized owner/name-key unique constraint reject stale names and collisions. It preserves IDs, associations and immutable revision snapshots; no journal rewrite, deletion, merge or private-name echo in errors. Uncertain client writes require directory re-reading before another explicit edit.
 - Restrict worker's credentials and allowed actions; AI only returns structured proposals; no automatic shell/SQL/tools from arbitrary webpage text.
 - External AI provider receives public news by default. Never send owner journal/media data to providers without opt-in.
 - Secrets via deployment environment or secret storage, never in Git, docs or logs. PostgreSQL not public.
