@@ -56,6 +56,7 @@ def seed() -> dict:
                 client_request_id=uuid4(),
                 tag_ids=[tags[0].id],
                 asset_ids=[assets[0].id],
+                is_pinned=True,
             ),
         )
         edit_entry(
@@ -68,6 +69,7 @@ def seed() -> dict:
                 entry_date="1999-12-31",
                 tag_ids=[],
                 asset_ids=[],
+                is_pinned=False,
             ),
         )
         edit_entry(
@@ -80,6 +82,7 @@ def seed() -> dict:
                 entry_date="2000-02-29",
                 tag_ids=[tags[1].id],
                 asset_ids=[assets[1].id],
+                is_pinned=True,
             ),
         )
         second, _ = create_entry(

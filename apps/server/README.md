@@ -1,6 +1,6 @@
 # LifeArchive API 与只读日记导出
 
-当前提供owner认证、日记CRUD/标签/回收站、月历/日期/往年今日和私密搜索，以及静态图片原文件上传/鉴权读取/日记关联与修订。搜索条件仅放POST体；导出v3使用只读快照、0600排他ZIP和写后哈希核验，包含所选日记当前/历史原图。没有新闻、AI或调度器。运行见根README、`docs/private-images-handoff.md`与`docs/export-format.md`。
+当前提供owner认证、日记CRUD/标签/回收站/置顶、日期视图/私密搜索和原图。置顶与其他日记字段共用CAS和快照；搜索条件仅放POST体。导出v4包括原文/标签/原图及当前历史置顶状态，沿用只读快照与哈希核验。无新闻/AI或调度器，运行见根README及各片交接。
 
 ## 开发与检查
 
@@ -66,7 +66,7 @@ docker compose exec -T api alembic upgrade head
 docker compose exec -T api alembic current
 ```
 
-新增ORM模型继承Base并注册Alembic。当前head为`0005_private_images`，新增assets/entry_assets和修订assets JSONB，旧快照回填[]；不要修改已应用迁移或直接回滚含数据迁移。图片依赖私有目录，原文件保留0600；Pillow13已锁版本，没有multipart依赖。SQLite只验证基础Session，业务/并发/迁移使用真实PostgreSQL。
+当前head为`0006_journal_pinning`，当前/历史新增Boolean is_pinned（旧数据false），添加活跃置顶排序索引；不改原文或日期。新模型继承Base并注册Alembic，不修改旧迁移或回滚含数据迁移。图片私有目录/0600与Pillow13锁依赖沿用，12无新依赖。业务/并发/迁移用真实PG。
 
 当前范围追加`tasks/11-private-images.md`。本机开发显式设置`LIFEARCHIVE_MEDIA_ROOT`为工作区外私密绝对目录；容器固定`/var/lib/lifearchive/media`并挂media卷。默认已登记图片总配额1GiB，可用`LIFEARCHIVE_MEDIA_QUOTA_BYTES`调整，单图5MiB/2000万像素上限固定。不要只备份PG而遗漏原文件；没有资产永久删除/GC。当前搜索未加全文索引，不承诺大规模性能；API/worker入口独立，worker仍无调度器。
 

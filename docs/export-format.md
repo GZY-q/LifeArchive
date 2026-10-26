@@ -1,4 +1,4 @@
-# 日记可移植导出格式 v3
+# 日记可移植导出格式 v4
 
 `python -m life_archive.cli export-journal` 读取当前唯一 owner 的日记，输出可直接用 ZIP/文本工具阅读的 Markdown、JSON 和完整所选修订。导出不依赖编辑器格式、worker、LLM 或 HTTP 服务。
 
@@ -46,12 +46,12 @@ manifest.json
 
 | 文件 | 字段 |
 | --- | --- |
-| 当前记录 `.json` | `id,user_id,entry_date,occurred_at,occurred_timezone,created_at,updated_at,deleted_at,revision,client_request_id,tags,assets,markdown_path` |
-| 修订 `.json` | `id,entry_id,editor_id,revision,entry_date,changed_at,tags,assets,markdown_path` |
+| 当前记录 `.json` | `id,user_id,entry_date,occurred_at,occurred_timezone,created_at,updated_at,deleted_at,revision,client_request_id,tags,assets,is_pinned,markdown_path` |
+| 修订 `.json` | `id,entry_id,editor_id,revision,entry_date,changed_at,tags,assets,is_pinned,markdown_path` |
 | `tags.json` | owner 全部标签的数组，每项 `{id,name,created_at}`，按 UUID 升序 |
 | `assets.json` | 所选日记当前/历史引用的资产数组，每项 `{id,mime_type,byte_size,sha256,width,height,created_at,file_path}`，按 UUID 升序 |
 | `assets/<uuid>.<ext>` | 原始图片字节，不转码、不删除EXIF；扩展名由已验证MIME映射 |
-| `manifest.json` | `schema_version:3,exported_at,alembic_revision,owner,deleted_policy,entry_count,revision_count,asset_count,files` |
+| `manifest.json` | `schema_version:4,exported_at,alembic_revision,owner,deleted_policy,entry_count,revision_count,asset_count,files` |
 | `owner` | `id,username,timezone,created_at` |
 | `files` 每项 | `path,bytes,sha256`；按 path 升序，覆盖全部原文/JSON/原始图片，不递归包含清单自身 |
 
@@ -60,6 +60,8 @@ manifest.json
 `tags` 是按 UUID 升序的 `{id,name}[]`：当前记录从关联读取，修订从不可变快照读取。`tags.json` 包括未使用标签及仅关联软删除日记的标签；`active_only` 仅筛选日记，不筛选 owner 标签目录。目录不导出内部规范化唯一键。旧数据升级后历史标签为空数组。
 
 当前/修订 `assets` 是按UUID排序的公开资产元数据，不含私有storage_key或服务器路径。`assets.json`仅额外加入ZIP内file_path；原文件按ID去重。默认导出涵盖所选活动日记全部历史引用的图片，即使当前已解除关联；仅被未选软删除日记引用的图片不包含，`--include-deleted`才扩大所选日记。尚未关联日记的上传不进入应用导出，需数据库与media卷备份保留。此边界与包含全部标签目录的tags.json不同。
+
+v4新增严格布尔is_pinned：当前值来自Entry，历史值来自不可变修订，旧数据迁移默认false，不反推历史。ZIP成员仍按UUID/修订号排列，不依照网页置顶顺序；置顶不改写日期或原文件。
 
 UUID 升序写当前日记，每篇修订号升序；清单最后写入。ZIP 成员权限为 0600，ZIP 自身的 DOS 时间固定为 1980-01-01，仅用于格式稳定，日记时间始终以 JSON 为准。同一源数据的 Markdown/JSON 文件字节稳定；`exported_at` 每次改变，因此整个 ZIP 的哈希可以不同。
 
@@ -92,10 +94,10 @@ import hashlib, json, sys, zipfile
 with zipfile.ZipFile(sys.argv[1]) as archive:
     names = archive.namelist()
     manifest = json.loads(archive.read('manifest.json'))
-    assert manifest['schema_version'] in (1, 2, 3)
+    assert manifest['schema_version'] in (1, 2, 3, 4)
     if manifest['schema_version'] >= 2:
         assert 'tags.json' in names
-    if manifest['schema_version'] == 3:
+    if manifest['schema_version'] >= 3:
         assets = json.loads(archive.read('assets.json'))
         assert len(assets) == manifest['asset_count']
         for asset in assets:
@@ -122,6 +124,6 @@ PY
 
 校验失败时该命令非零退出，不能将该文件作为完整导出使用。格式或字段语义变化应另行升级版本并更新消费者；格式不包含任何执行 SQL/脚本或自动导入步骤。
 
-## 已有 v1/v2 文件
+## 已有 v1/v2/v3 文件
 
-任务05/06写出的v1文件没有tags.json，当前/修订JSON没有tags；任务08的v2增加标签，但没有assets.json/图片/assets字段/asset_count。其余路径、原文、哈希、权限和删除策略约定相同。上面的核验器接受v1/v2/v3，读取者先检查schema_version。当前CLI只写v3，不提供降级写出或ZIP导入；历史验收的文件数和迁移号保留为当时证据。
+v1没有标签目录/字段；v2增加标签；v3增加原图/assets.json/assets字段/asset_count，尚无is_pinned。v4在当前和历史JSON增加置顶布尔值，其余路径、原文、媒体、哈希、权限与删除策略相同。核验器接受v1–v4，读取者先查schema_version；当前CLI只写v4，无降级写出或ZIP导入。历史验收的格式、文件数与迁移号保留当时证据。

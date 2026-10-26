@@ -53,6 +53,12 @@ sharing the same CAS and transaction as text/date/tags. Creation replay compares
 asset-ID sets. Detach/delete/restore retains originals and historical references.
 Upload and authenticated original reads live in `media/`; portable export v3 includes
 selected current/historical originals. This module does not implement news or AI.
+Task12 adds `0006_journal_pinning`: current/revision strict boolean pin state,
+default false for old records, the same journal CAS/snapshot, and an active-owner
+pin/date index. GET /entries defaults to date order; explicit order=pinned groups
+pins first while preserving date order inside each group. Cursors bind order;
+old date cursors remain compatible. Delete/restore retains pin state; portable
+export v4 includes current/historical booleans. Other date views keep their ordering.
 Tests under `tests/journal` use the shared real-PostgreSQL fixtures, including
 simultaneous creation and edits. Run with the test database configuration from
 the server README. For the focused tag checks:

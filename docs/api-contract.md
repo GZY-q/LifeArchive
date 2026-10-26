@@ -9,12 +9,12 @@ M1 已实现 health、owner 会话和最小日记闭环；M2 已分片扩展月�
 - `GET /auth/me`：同上会话响应，未认证 401；CSRF token 仅放内存，不放 localStorage。
 - `POST /auth/logout`：可信 `Origin` + `X-CSRF-Token`，撤销会话并清 cookie，204。
 - 所有日记接口都要求有效会话，写入还要求可信 `Origin` 和本会话的 `X-CSRF-Token`。私密 API 响应，包括错误响应，均 `Cache-Control: no-store`。
-- `POST /entries`：`{content_md,entry_date,client_request_id?,tag_ids?,asset_ids?}`。新建201，创建重放200。Markdown非空、最多100,000字符，原文不trim；日期严格YYYY-MM-DD。请求ID对比revision1原始内容/日期/标签及资产ID集合，不同请求体409/idempotency_conflict；当前软删除的请求重放404，不复活。
-- `GET /entries?limit=20&cursor=...&entry_date=...&tag_id=...`：`{items,next_cursor}`，limit 1–100；按日记日期、创建时间、ID 降序做 keyset 分页。日期和单标签过滤可选、组合为 AND，cursor 不得跨过滤条件复用；无权或不存在的 tag_id 返回空列表。
-- `GET /entries/{id}`：返回 `{id,content_md,entry_date,revision,created_at,updated_at,occurred_at,occurred_timezone,tags,assets}`，occurrence两项当前为空；无权限、不存在或已删除均404。
-- `PATCH /entries/{id}`：`{expected_revision,content_md?,entry_date?,tag_ids?,asset_ids?}`，至少一项修改，不能为空。原子检查修订号并更新正文/日期/标签/图片关联、递增revision、插入快照；仅关联变化也递增。旧修订409/revision_conflict。
+- `POST /entries`：`{content_md,entry_date,client_request_id?,tag_ids?,asset_ids?,is_pinned?}`。新建201，重放200；is_pinned严格布尔，默认false。请求ID对比revision1正文/日期/标签与资产ID集合/置顶状态，不同请求体409/idempotency_conflict，当前软删除重放404。Markdown非空最多100,000字符、不trim；日期严格YYYY-MM-DD。
+- `GET /entries?limit=20&cursor=...&entry_date=...&tag_id=...&order=date`：`{items,next_cursor}`，limit1–100。默认date按日记日期/创建时间/ID降序；pinned模式置顶优先后按原日期排序。日期与单标签过滤AND，游标不能跨过滤/排序复用，未知/越权标签为空列表。
+- `GET /entries/{id}`：返回 `{id,content_md,entry_date,revision,created_at,updated_at,occurred_at,occurred_timezone,tags,assets,is_pinned}`，occurrence两项当前为空；无权限、不存在或已删除均404。
+- `PATCH /entries/{id}`：`{expected_revision,content_md?,entry_date?,tag_ids?,asset_ids?,is_pinned?}`，至少一项，拒绝null。共用CAS更新字段/关联、递增revision并快照；置顶为严格布尔，省略保持。旧修订409/revision_conflict。
 - `DELETE /entries/{id}?expected_revision=N`：原子修订检查后软删除，204；保留原文和历史并创建删除快照，可通过回收站恢复。没有永久删除接口。
-- `GET /entries/{id}/revisions?limit=20&before_revision=N`：`{items,next_cursor}`，快照包含 `{revision,content_md,entry_date,changed_at,editor_id,tags,assets}`；按revision降序，next_cursor是下一页before_revision，创建时即保留revision1。
+- `GET /entries/{id}/revisions?limit=20&before_revision=N`：`{items,next_cursor}`，快照包含 `{revision,content_md,entry_date,changed_at,editor_id,tags,assets,is_pinned}`；按revision降序，next_cursor是下一页before_revision，创建时即保留revision1。
 - 所有 instants 为 UTC、带时区；`entry_date` 是独立用户日历日期。格式错误 422 使用通用响应，不回显密码、原文或提交值。
 
 ## 08：日记标签
@@ -43,6 +43,14 @@ M1 已实现 health、owner 会话和最小日记闭环；M2 已分片扩展月�
 - POST/PATCH `/entries` 新增 `asset_ids`（最多10个不同UUID）：创建省略[]，PATCH省略保持、[]解除当前关联、null拒绝；无权或不存在统一422。与正文/日期/标签共用revision CAS与同一事务，附件变化也创建修订；创建请求重放比较revision1资产ID集合。正文仍须非空，不自动插入Markdown图片语法。
 - EntryResponse及RevisionResponse新增 `assets`，为按UUID升序的完整公开资产元数据；回收站继承该字段。修订保存不可变元数据快照。解除当前关联、软删除或恢复不会删除原文件；历史仍可读取。原图字节与EXIF保留，不转码。
 - 迁移0005_private_images，私有本地卷存原文件，导出v3包含所选当前/历史引用原图。详见 [图片交接](private-images-handoff.md) 与 [导出格式](export-format.md)。
+
+## 12：日记置顶
+
+- 现有PATCH提交 `{expected_revision,is_pinned:true|false}`，只改置顶也增加修订/UTC updated_at，并保存正文、日期、标签、图片和置顶快照。不改entry_date/created_at，不另建pin接口；删除保留状态，恢复后仍置顶。
+- 日记主列表显式 `order=pinned`，按 `(is_pinned DESC,entry_date DESC,created_at DESC,id DESC)`。置顶组内仍按日记日期，不按置顶操作时间；没有拖拽或自定义顺序。API默认order=date，日详情/搜索/往年今日/回收站沿用原排序。
+- 日记游标增加filter_order与位置is_pinned，缺省date/false兼容旧日期游标；pinned/date不能互换。置顶变化可跨页移动记录，分页不是快照，变更后刷新首屏。
+- 前端置顶写入使用全局busy保护，正在编辑同篇时禁用卡片动作；成功刷新列表、不重挂编辑器。冲突或不确定结果提示刷新核对，不覆盖未保存草稿/图片/冻结UUID/409面板。
+- 0006_journal_pinning为当前/历史增加is_pinned，旧记录false；导出v4增加当前/历史同名字段，原图/清单约定不变。
 
 ## M2 第一片：月历与日详情
 

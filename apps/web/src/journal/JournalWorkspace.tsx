@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { Session } from '../api/auth';
 import { ApiError, errorMessage, isUnauthorized } from '../api/client';
-import { deleteEntry, listEntries } from '../api/journal';
+import { deleteEntry, listEntries, setEntryPinned } from '../api/journal';
 import type { Entry } from '../api/journal';
 import { listTags } from '../api/tags';
 import type { Tag } from '../api/tags';
@@ -36,6 +36,7 @@ export function JournalWorkspace({
   const [listFailure, setListError] = useState('');
   const [loadedVersion, setLoadedVersion] = useState(refreshVersion);
   const [actionError, setActionError] = useState('');
+  const [pinBlocked, setPinBlocked] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [formKey, setFormKey] = useState(0);
@@ -82,6 +83,7 @@ export function JournalWorkspace({
       .then((result) => {
         if (controller.signal.aborted) return;
         setEntries(result.items);
+        setPinBlocked([]);
         setCursor(result.next_cursor);
         setListError('');
       })
@@ -110,6 +112,7 @@ export function JournalWorkspace({
     nextRequest.current?.abort();
     setLoading(true);
     setListError('');
+    setActionError('');
     setRefresh((current) => current + 1);
   }
 
@@ -173,6 +176,47 @@ export function JournalWorkspace({
   function writing(value: boolean) {
     setBusy(value);
     onBusy(value);
+  }
+
+  async function pin(entry: Entry) {
+    if (
+      busy ||
+      disabled ||
+      loadedVersion !== refreshVersion ||
+      draft.original?.id === entry.id ||
+      pinBlocked.includes(entry.id)
+    )
+      return;
+    firstRequest.current?.abort();
+    nextRequest.current?.abort();
+    setLoading(false);
+    setCursor(null);
+    writing(true);
+    setActionError('');
+    setSaved('');
+    try {
+      const updated = await setEntryPinned(
+        entry,
+        !entry.is_pinned,
+        session.csrf_token,
+      );
+      setSaved(updated.is_pinned ? '日记已置顶。' : '已取消置顶。');
+      refreshList();
+    } catch (cause) {
+      if (isUnauthorized(cause)) onExpired();
+      else {
+        setPinBlocked((current) => [...current, entry.id]);
+        setActionError(
+          cause instanceof ApiError && cause.status === 409
+            ? '这篇日记已有修改，请刷新列表、核对置顶状态后再操作。'
+            : cause instanceof ApiError && cause.status === 0
+              ? '置顶结果尚未确认。请刷新列表核对，再决定是否重试。'
+              : `${errorMessage(cause)} 请刷新列表核对置顶状态。`,
+        );
+      }
+    } finally {
+      writing(false);
+    }
   }
 
   async function remove(entry: Entry) {
@@ -288,6 +332,10 @@ export function JournalWorkspace({
             disabled={busy || disabled || draft.original?.id === entry.id}
             onEdit={changeDraft}
             onDelete={(item) => void remove(item)}
+            onPin={(item) => void pin(item)}
+            pinDisabled={
+              loadedVersion !== refreshVersion || pinBlocked.includes(entry.id)
+            }
             onExpired={onExpired}
           />
         ))}

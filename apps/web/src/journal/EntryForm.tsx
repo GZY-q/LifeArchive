@@ -10,6 +10,7 @@ import type { Draft } from './draft';
 import { TagBadges } from './TagBadges';
 import { TagPicker } from './TagPicker';
 import { AssetGallery } from './AssetGallery';
+import { PinnedBadge } from './PinnedBadge';
 import { AssetPicker } from './AssetPicker';
 
 type Props = {
@@ -235,6 +236,7 @@ export function EntryForm({
                 <h3>
                   服务器版本 {latest.revision} · {latest.entry_date}
                 </h3>
+                <PinnedBadge isPinned={latest.is_pinned} />
                 <pre className="markdown-text">{latest.content_md}</pre>
                 <TagBadges tags={latest.tags} />
                 <AssetGallery assets={latest.assets} onExpired={onExpired} />

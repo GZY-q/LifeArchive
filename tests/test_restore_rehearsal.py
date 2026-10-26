@@ -364,8 +364,8 @@ class PortableComparisonTests(unittest.TestCase):
         path = self.root / name
         member = "entries/00000000-0000-0000-0000-000000000001.md"
         manifest = {
-            "schema_version": 3,
-            "alembic_revision": "0005_private_images",
+            "schema_version": 4,
+            "alembic_revision": "0006_journal_pinning",
             "owner": {"id": "owner"},
             "deleted_policy": "include_deleted",
             "entry_count": 1,
@@ -401,7 +401,7 @@ class PortableComparisonTests(unittest.TestCase):
         a = self.archive("a.zip")
         b = self.archive("b.zip", exported_at="2026-10-25T00:01:00+00:00")
         self.assertEqual(
-            checks.compare_exports(a, b, "0005_private_images"),
+            checks.compare_exports(a, b, "0006_journal_pinning"),
             {
                 "entries": 1,
                 "revisions": 0,
@@ -411,14 +411,14 @@ class PortableComparisonTests(unittest.TestCase):
         )
         changed = self.archive("changed.zip", content=b"changed")
         with self.assertRaises(support.RestoreError):
-            checks.compare_exports(a, changed, "0005_private_images")
+            checks.compare_exports(a, changed, "0006_journal_pinning")
         with self.assertRaises(support.RestoreError):
             checks.compare_exports(a, b, "other_head")
 
     def test_corrupt_export_hash_is_rejected(self):
         a, b = self.archive("a.zip"), self.archive("bad.zip", bad_hash=True)
         with self.assertRaises(support.RestoreError):
-            checks.compare_exports(a, b, "0005_private_images")
+            checks.compare_exports(a, b, "0006_journal_pinning")
 
 
 if __name__ == "__main__":

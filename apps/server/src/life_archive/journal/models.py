@@ -78,6 +78,9 @@ class Entry(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revision: Mapped[int] = mapped_column(nullable=False)
+    is_pinned: Mapped[bool] = mapped_column(
+        nullable=False, default=False, server_default=text("false")
+    )
     client_request_id: Mapped[UUID | None]
     tags: Mapped[list[Tag]] = relationship(
         secondary=EntryTag.__table__,
@@ -109,6 +112,16 @@ Index(
     Entry.id.desc(),
 )
 
+Index(
+    "ix_entries_active_owner_pinned_date_created_id",
+    Entry.user_id,
+    Entry.is_pinned.desc(),
+    Entry.entry_date.desc(),
+    Entry.created_at.desc(),
+    Entry.id.desc(),
+    postgresql_where=Entry.deleted_at.is_(None),
+)
+
 
 class EntryRevision(Base):
     __tablename__ = "entry_revisions"
@@ -124,6 +137,9 @@ class EntryRevision(Base):
     entry_date: Mapped[date] = mapped_column(Date, nullable=False)
     revision: Mapped[int] = mapped_column(nullable=False)
     changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    is_pinned: Mapped[bool] = mapped_column(
+        nullable=False, default=False, server_default=text("false")
+    )
     tags: Mapped[list[dict[str, str]]] = mapped_column(
         JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
     )

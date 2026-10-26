@@ -16,6 +16,7 @@ from life_archive.journal.models import Entry, EntryRevision, EntryTag, Tag
 from life_archive.journal.schemas import (
     EntryCreate,
     EntryCursor,
+    EntryOrder,
     EntryPage,
     EntryResponse,
     EntryUpdate,
@@ -57,6 +58,7 @@ def _snapshot(session: Session, entry: Entry, editor_id: UUID) -> None:
             entry_date=entry.entry_date,
             revision=entry.revision,
             changed_at=entry.updated_at,
+            is_pinned=entry.is_pinned,
             tags=[{"id": str(tag.id), "name": tag.name} for tag in entry.tags],
             assets=[
                 AssetResponse.model_validate(asset).model_dump(mode="json")
@@ -83,6 +85,7 @@ def _replay(session: Session, entry: Entry, payload: EntryCreate) -> tuple[Entry
     if (
         original.content_md != payload.content_md
         or original.entry_date != payload.entry_date
+        or original.is_pinned != payload.is_pinned
         or {UUID(tag["id"]) for tag in original.tags} != set(payload.tag_ids)
         or {UUID(asset["id"]) for asset in original.assets} != set(payload.asset_ids)
     ):
@@ -159,6 +162,7 @@ def create_entry(session: Session, user_id: UUID, payload: EntryCreate) -> tuple
         created_at=now,
         updated_at=now,
         revision=1,
+        is_pinned=payload.is_pinned,
     )
     try:
         _validate_tags(session, user_id, payload.tag_ids)
@@ -246,11 +250,17 @@ def delete_entry(session: Session, user_id: UUID, entry_id: UUID, expected_revis
         raise
 
 
-def _decode_cursor(cursor: str, filter_date: date | None, tag_id: UUID | None) -> EntryCursor:
+def _decode_cursor(
+    cursor: str, filter_date: date | None, tag_id: UUID | None, order: EntryOrder
+) -> EntryCursor:
     try:
         decoded = base64.b64decode(cursor + "=" * (-len(cursor) % 4), altchars=b"-_", validate=True)
         value = EntryCursor.model_validate_json(decoded)
-        if value.filter_date != filter_date or value.filter_tag_id != tag_id:
+        if (
+            value.filter_date != filter_date
+            or value.filter_tag_id != tag_id
+            or value.filter_order != order
+        ):
             raise ValueError("Cursor belongs to a different filter")
     except (ValueError, binascii.Error, ValidationError) as error:
         raise HTTPException(status_code=422, detail="Invalid pagination cursor") from error
@@ -265,6 +275,7 @@ def list_entries(
     cursor: str | None,
     entry_date: date | None,
     tag_id: UUID | None = None,
+    order: EntryOrder = "date",
 ) -> EntryPage:
     statement = select(Entry).where(Entry.user_id == user_id, Entry.deleted_at.is_(None))
     if entry_date is not None:
@@ -280,18 +291,21 @@ def list_entries(
             .exists()
         )
     if cursor is not None:
-        position = _decode_cursor(cursor, entry_date, tag_id)
-        statement = statement.where(
-            tuple_(Entry.entry_date, Entry.created_at, Entry.id)
-            < (position.entry_date, position.created_at, position.id)
-        )
-    entries = list(
-        session.scalars(
-            statement.order_by(
-                Entry.entry_date.desc(), Entry.created_at.desc(), Entry.id.desc()
-            ).limit(limit + 1)
-        )
-    )
+        position = _decode_cursor(cursor, entry_date, tag_id, order)
+        if order == "pinned":
+            statement = statement.where(
+                tuple_(Entry.is_pinned, Entry.entry_date, Entry.created_at, Entry.id)
+                < (position.is_pinned, position.entry_date, position.created_at, position.id)
+            )
+        else:
+            statement = statement.where(
+                tuple_(Entry.entry_date, Entry.created_at, Entry.id)
+                < (position.entry_date, position.created_at, position.id)
+            )
+    sorting = [Entry.entry_date.desc(), Entry.created_at.desc(), Entry.id.desc()]
+    if order == "pinned":
+        sorting.insert(0, Entry.is_pinned.desc())
+    entries = list(session.scalars(statement.order_by(*sorting).limit(limit + 1)))
     next_cursor = None
     if len(entries) > limit:
         last = entries[limit - 1]
@@ -301,6 +315,8 @@ def list_entries(
             id=last.id,
             filter_date=entry_date,
             filter_tag_id=tag_id,
+            filter_order=order,
+            is_pinned=last.is_pinned,
         )
         next_cursor = (
             base64.urlsafe_b64encode(position.model_dump_json().encode()).decode().rstrip("=")

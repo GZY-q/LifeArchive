@@ -5,6 +5,7 @@ import { listRevisions } from '../api/journal';
 import type { EntryRevision } from '../api/journal';
 import { TagBadges } from './TagBadges';
 import { AssetGallery } from './AssetGallery';
+import { PinnedBadge } from './PinnedBadge';
 
 export function RevisionHistory({
   entryId,
@@ -68,6 +69,7 @@ export function RevisionHistory({
           <p className="small-note">
             版本 {revision.revision} · 日记日期 {revision.entry_date}
           </p>
+          <PinnedBadge isPinned={revision.is_pinned} />
           <pre className="markdown-text">{revision.content_md}</pre>
           <TagBadges tags={revision.tags} />
           <AssetGallery assets={revision.assets} onExpired={onExpired} />

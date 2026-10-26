@@ -9,6 +9,7 @@ export type Entry = {
   content_md: string;
   entry_date: string;
   revision: number;
+  is_pinned: boolean;
   created_at: string;
   updated_at: string;
   tags: TagLabel[];
@@ -16,7 +17,7 @@ export type Entry = {
 };
 export type EntryRevision = Pick<
   Entry,
-  'content_md' | 'entry_date' | 'revision' | 'tags' | 'assets'
+  'content_md' | 'entry_date' | 'revision' | 'tags' | 'assets' | 'is_pinned'
 > & {
   changed_at: string;
   editor_id: string;
@@ -36,7 +37,8 @@ export function entryFrom(value: unknown): Entry {
     !Number.isInteger(value.revision) ||
     (value.revision as number) < 1 ||
     typeof value.created_at !== 'string' ||
-    typeof value.updated_at !== 'string'
+    typeof value.updated_at !== 'string' ||
+    typeof value.is_pinned !== 'boolean'
   )
     return invalidResponse();
   return {
@@ -51,7 +53,7 @@ export async function listEntries(
   signal?: AbortSignal,
   tagId?: string,
 ): Promise<{ items: Entry[]; next_cursor: string | null }> {
-  const query = new URLSearchParams({ limit: '20' });
+  const query = new URLSearchParams({ limit: '20', order: 'pinned' });
   if (cursor) query.set('cursor', cursor);
   if (tagId) query.set('tag_id', tagId);
   const value = await request(`/entries?${query}`, { signal });
@@ -91,6 +93,20 @@ export async function updateEntry(
   );
 }
 
+export async function setEntryPinned(
+  entry: Entry,
+  isPinned: boolean,
+  csrfToken: string,
+): Promise<Entry> {
+  return entryFrom(
+    await request(`/entries/${encodeURIComponent(entry.id)}`, {
+      method: 'PATCH',
+      body: { expected_revision: entry.revision, is_pinned: isPinned },
+      csrfToken,
+    }),
+  );
+}
+
 export async function deleteEntry(
   entry: Entry,
   csrfToken: string,
@@ -125,7 +141,8 @@ export async function listRevisions(
       typeof item.content_md !== 'string' ||
       typeof item.entry_date !== 'string' ||
       typeof item.changed_at !== 'string' ||
-      typeof item.editor_id !== 'string'
+      typeof item.editor_id !== 'string' ||
+      typeof item.is_pinned !== 'boolean'
     )
       return invalidResponse();
     return {

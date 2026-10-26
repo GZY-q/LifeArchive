@@ -80,6 +80,15 @@ class Client:
             [row["revision"] for row in result["history"]["items"]] == [3, 2, 1],
             "Restored revision history mismatch",
         )
+        require(
+            result["entry"]["is_pinned"] is True
+            and [row["is_pinned"] for row in result["history"]["items"]] == [True, False, True]
+            and all(
+                row["is_pinned"] is (row["id"] == ids["first"])
+                for row in result["entries"]["items"]
+            ),
+            "Restored current or historical pin state mismatch",
+        )
         result["tags"] = self.request("/tags?limit=200")
         require(
             {tag["id"] for tag in result["tags"]["items"]}
@@ -163,7 +172,7 @@ def file_sha256(path: Path) -> str:
 def verified_manifest(archive: ZipFile) -> dict:
     manifest = json.loads(archive.read("manifest.json"))
     require(
-        manifest["schema_version"] == 3 and manifest["deleted_policy"] == "include_deleted",
+        manifest["schema_version"] == 4 and manifest["deleted_policy"] == "include_deleted",
         "Unexpected portable export format or deleted policy",
     )
     names = archive.namelist()
