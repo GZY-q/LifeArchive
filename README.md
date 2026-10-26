@@ -15,6 +15,7 @@ LifeArchive 是一个独立实现、单用户优先、自托管、面向几十�
 - 提供只读日记导出 CLI：原始 Markdown、JSON 元数据、所选日记全部修订与 SHA-256 清单；可显式包含软删除记录，拒绝覆盖已有目标。
 - 提供隔离恢复演练脚本：新建合成源和空目标，验证 PG dump/restore、原文/修订/导出一致性和重启后读取；完整自动化加密备份仍待后续。
 - 日记标签提供私密目录、创建/勾选、随日记原子保存、修订快照和列表单标签筛选；导出保留标签目录与历史标签。范围和接手见 [08 工单](tasks/08-journal-tags.md) 与 [标签交接](docs/journal-tags-handoff.md)。
+- “标签”管理页支持改名，保留标签 ID 和日记关联，历史修订仍显示原名称；重名或并发修改先核对再提交。无迁移，见 [15工单](tasks/15-tag-renaming.md) 与 [改名交接](docs/tag-renaming-handoff.md)。
 - 回收站支持分页查看软删除日记和逐篇恢复；保留原文、标签、原 ID 与历史，恢复创建新修订并检查并发版本。没有永久清除功能，见 [09 工单](tasks/09-journal-trash.md) 与 [交接](docs/journal-trash-handoff.md)。
 - 日记列表支持置顶/取消置顶，跨页优先显示；置顶作为修订保存，不改变日记日期，日历和归档沿用时间排序。见 [12工单](tasks/12-journal-pinning.md) 与 [置顶交接](docs/journal-pinning-handoff.md)。
 - 私密图片附件支持静态JPEG/PNG/WebP原图上传、日记关联和历史、登录后查看/下载；原文件保存在私有media卷，当前导出v4包含所选当前/历史原图和置顶状态。大小/配额/恢复边界见 [11工单](tasks/11-private-images.md) 和 [图片交接](docs/private-images-handoff.md)。
@@ -211,6 +212,7 @@ tasks/            严格按顺序执行的里程碑工单
 - `tasks/12-journal-pinning.md` — 置顶排序、修订、游标与导出v4
 - `tasks/13-account-security.md` — 改密、旧会话撤销与草稿保留
 - `tasks/14-markdown-preview.md` — 原文保留、安全只读预览与链接/媒体边界
+- `tasks/15-tag-renaming.md` — 标签改名、名称冲突与历史快照保留
 - `docs/next-steps.md` — 依赖顺序、验收状态与接手提示词
 - `docs/decisions.md` — 核心技术决策
 - `docs/m0-handoff.md` — M0 实现边界、代码入口和 M1 交接

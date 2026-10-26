@@ -27,7 +27,7 @@ EntryOrder = Literal["date", "pinned"]
 
 
 def normalize_tag_name(value: str) -> tuple[str, str]:
-    if any(unicodedata.category(char) in {"Cc", "Zl", "Zp"} for char in value):
+    if any(unicodedata.category(char) in {"Cc", "Cs", "Zl", "Zp"} for char in value):
         raise ValueError("Tag names cannot contain control characters or line breaks")
     name = unicodedata.normalize("NFC", value.strip())
     key = unicodedata.normalize("NFKC", name).casefold()
@@ -57,6 +57,11 @@ class TagCreate(BaseModel):
     @classmethod
     def validate_name(cls, value: str) -> str:
         return normalize_tag_name(value)[0]
+
+
+class TagRename(TagCreate):
+    # This is a comparison token from a prior catalogue read, not a new name.
+    expected_name: Annotated[str, Field(strict=True, min_length=1, max_length=40)]
 
 
 class TagLabel(BaseModel):

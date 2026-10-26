@@ -12,6 +12,7 @@ import { emptySearchForm } from '../search/form';
 import { TrashWorkspace } from '../trash/TrashWorkspace';
 import { LoginForm } from './LoginForm';
 import { AccountWorkspace } from './AccountWorkspace';
+import { TagsWorkspace } from '../tags/TagsWorkspace';
 
 export function AuthGate() {
   const [session, setSession] = useState<Session | null>(null);
@@ -24,13 +25,17 @@ export function AuthGate() {
   const [writeBusy, setWriteBusy] = useState(false);
   const [revalidating, setRevalidating] = useState(false);
   const [view, setView] = useState<
-    'journal' | 'calendar' | 'archive' | 'trash' | 'account'
+    'journal' | 'calendar' | 'archive' | 'trash' | 'account' | 'tags'
   >('journal');
   const [calendarDate, setCalendarDate] = useState<string | null>(null);
   const [searchForm, setSearchForm] = useState(emptySearchForm);
   const [journalRefresh, setJournalRefresh] = useState(0);
   const [securityUncertain, setSecurityUncertain] = useState(false);
   const ownerId = useRef<string | null>(null);
+  const refreshCatalogue = useCallback(
+    () => setJournalRefresh((value) => value + 1),
+    [],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -242,6 +247,15 @@ export function AuthGate() {
         >
           回收站
         </button>
+        <button
+          type="button"
+          className={`nav-item ${view === 'tags' ? 'selected' : ''}`}
+          aria-current={view === 'tags' ? 'page' : undefined}
+          disabled={signingOut || revalidating || writeBusy}
+          onClick={() => setView('tags')}
+        >
+          标签管理
+        </button>
       </nav>
       {draft && (
         <div hidden={view !== 'journal'}>
@@ -293,6 +307,15 @@ export function AuthGate() {
           onUncertain={() => setSecurityUncertain(true)}
           onExpired={expire}
           onBusy={setWriteBusy}
+        />
+      )}
+      {view === 'tags' && (
+        <TagsWorkspace
+          csrfToken={session.csrf_token}
+          onExpired={expire}
+          onBusy={setWriteBusy}
+          onCatalogue={refreshCatalogue}
+          disabled={signingOut || revalidating}
         />
       )}
     </>

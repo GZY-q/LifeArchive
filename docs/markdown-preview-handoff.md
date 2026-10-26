@@ -51,4 +51,6 @@ npm test -- --run src/components/MarkdownPreview.test.tsx src/journal/MarkdownPr
 
 ## 下一片建议
 
+后续只读核对：提交`0a1a9bc938ce50431f5d412ccd9a75cbc72a56bf`的[PR #15](https://github.com/GZY-q/LifeArchive/pull/15)及[自动CI 40327841694](https://github.com/GZY-q/LifeArchive/actions/runs/40327841694)已完成且成功。本机未追加全量检查；该结果不替代后续标签改名验收。
+
 15建议标签改名：先明确唯一性/并发、ID稳定、历史名称快照不回写、目录和已提交筛选摘要刷新；不改Markdown、不删除关联或历史。标签/媒体永久清除需要独立保留策略，不能顺手加入。低成本模型接手复用当前渲染器、图库和草稿边界，不重搭编辑器或调用外部AI。

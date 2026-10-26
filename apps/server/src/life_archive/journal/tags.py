@@ -3,12 +3,19 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from life_archive.journal.models import Tag
-from life_archive.journal.schemas import TagCreate, TagPage, TagResponse, normalize_tag_name
+from life_archive.journal.schemas import (
+    TagCreate,
+    TagPage,
+    TagRename,
+    TagResponse,
+    normalize_tag_name,
+)
 
 
 def create_tag(session: Session, user_id: UUID, payload: TagCreate) -> tuple[Tag, bool]:
@@ -31,6 +38,41 @@ def create_tag(session: Session, user_id: UUID, payload: TagCreate) -> tuple[Tag
         session.rollback()
         raise
     return tag, True
+
+
+def rename_tag(session: Session, user_id: UUID, tag_id: UUID, payload: TagRename) -> Tag:
+    """Rename one catalogue row without rewriting journal or revision snapshots."""
+    name, name_key = normalize_tag_name(payload.name)
+    try:
+        tag = session.scalar(
+            select(Tag)
+            .where(Tag.id == tag_id, Tag.user_id == user_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        if tag is None:
+            raise HTTPException(404, "Tag not found")
+        if tag.name != payload.expected_name:
+            raise HTTPException(
+                409,
+                {"code": "tag_conflict", "message": "Tag changed; reload before renaming"},
+            )
+        tag.name = name
+        tag.name_key = name_key
+        session.commit()
+    except IntegrityError as error:
+        session.rollback()
+        if getattr(getattr(error.orig, "diag", None), "constraint_name", None) != (
+            "uq_tags_user_id_name_key"
+        ):
+            raise
+        raise HTTPException(
+            409, {"code": "tag_name_taken", "message": "Tag name is already in use"}
+        ) from None
+    except Exception:
+        session.rollback()
+        raise
+    return tag
 
 
 def list_tags(session: Session, user_id: UUID, *, limit: int, cursor: UUID | None) -> TagPage:

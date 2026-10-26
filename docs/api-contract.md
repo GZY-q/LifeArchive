@@ -27,7 +27,7 @@ M1 已实现 health、owner 会话和最小日记闭环；M2 已分片扩展月�
 - 名称请求长度 1–256，展示名去首尾空白并 NFC，唯一键 NFKC + casefold；规范化后均为 1–40 字符，不允许控制字符/换行/空名。
 - 日记 `tag_ids` 为至多 20 个不重复 UUID：创建省略视为 `[]`，PATCH 省略保持，`[]` 清空，null 拒绝；无权/不存在统一 422，整个日记写入回滚。
 - 当前/修订 `tags` 为按 UUID 升序的 `{id,name}[]`。历史保存名称快照；删除最终修订保留当时标签。标签不解析或改写 Markdown。
-- 没有标签改名/删除、层级或独立的日记标签写接口；归档搜索标签条件由10扩展，见下文。
+- 标签改名由15扩展；没有删除、层级或独立的日记标签写接口。归档搜索标签条件由10扩展，见下文。
 
 ## 09：回收站查看与恢复
 
@@ -66,6 +66,14 @@ M1 已实现 health、owner 会话和最小日记闭环；M2 已分片扩展月�
 预览完全在前端派生，不读取/写入新接口、不创建修订或改写content_md；原文默认可见、独立切换，现有MarkdownEditor一直挂载。CommonMark/GFM只读渲染，原始HTML忽略、代码不执行；绝对http/https且无凭据/控制字符的链接才可点击，新页noopener/noreferrer/no-referrer。其他URL降纯文本，Markdown图片只显示alt占位，不读取src，私密图片继续AssetGallery鉴权懒加载。
 
 预览不进入请求体、数据库或导出，head0006/格式v4不变；冻结创建UUID、401/密码轮换和409草稿边界沿用。不是富文本编辑器或HTML清洗接口；真实IME矩阵仍以07人工证据为准。
+
+## 15：标签改名
+
+- `PATCH /tags/{tag_id}`：严格JSON `{name,expected_name}`，响应200 `{id,name,created_at}`。name复用08规范；expected_name必须是读取的原样名称，严格字符串1–40字符，不trim或归一化。拒绝额外字段/null，格式错误422不回显输入。
+- 有效会话、可信Origin、JSON、X-LifeArchive-Request:1及CSRF必需；所有响应no-store。不存在/越权统一404。锁内旧名称不匹配409/tag_conflict；新规范唯一键已被其他标签占用409/tag_name_taken，事务回滚。expected_name匹配且目标名称相同返回成功，不产生额外写入。
+- 保留ID/created_at和日记关联；不改正文/日期/revision或既有历史快照。当前读取/目录用新名，旧修订仍用旧名；创建UUID重放继续比较标签ID。无迁移，导出v4不变。
+- 前端“标签”页显式保存；忙碌时阻止重复请求、导航和退出。冲突或网络/5xx结果不确定时保留输入、阻断直接重试，先重新读取目录再显式编辑。管理页目录核对与成功改名刷新仍挂载的日记目录/列表，不重挂载编辑器或重置草稿/标签ID/冻结UUID/409；其他视图再次进入时重读。归档仍须显式搜索，摘要绑定已提交条件。
+- expected_name用于防止陈旧名称覆盖，不是单调版本号；A→B→A不能检测。无标签删除/合并/层级，不回写任何历史名称。
 
 ## M2 第一片：月历与日详情
 
@@ -108,6 +116,7 @@ This is the intended resource boundary, **not implemented endpoints**. Responses
 | GET | `/auth/me` | current owner |
 | GET / POST | `/entries` | paginated list, create |
 | GET / POST | `/tags` | private paginated catalog, idempotent name creation |
+| PATCH | `/tags/{id}` | rename with exact expected name; retain IDs and historical snapshots |
 | GET / PATCH / DELETE | `/entries/{id}` | detail, edit, trash |
 | GET | `/entries/{id}/revisions` | version audit |
 | POST | `/entries/{id}/restore` | recover soft-deleted |

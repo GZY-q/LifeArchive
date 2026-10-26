@@ -624,6 +624,7 @@ textarea:focus-visible {
 
 .workspace-navigation {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 24px;
   border-bottom: 1px solid #e0e2d9;
@@ -633,7 +634,7 @@ textarea:focus-visible {
 .workspace-navigation .nav-item {
   gap: 12px;
   justify-content: center;
-  flex: 1;
+  flex: 1 1 72px;
 }
 
 .calendar-panel {
@@ -1090,4 +1091,41 @@ h2 {
   border: 1px solid #e0e2d9;
   border-radius: 10px;
   background: #fafbf6;
+}
+
+.tags-workspace {
+  min-width: 0;
+  padding: 24px;
+}
+
+.tag-catalogue {
+  margin: 20px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tag-catalogue li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid #e0e2d9;
+  overflow-wrap: anywhere;
+}
+
+.tag-rename-form {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.tag-rename-form input {
+  min-width: 0;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d5d9cc;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
 }
