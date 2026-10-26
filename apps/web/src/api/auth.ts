@@ -43,3 +43,30 @@ export async function login(
 export async function logout(csrfToken: string): Promise<void> {
   await request('/auth/logout', { method: 'POST', csrfToken });
 }
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+  csrfToken: string,
+): Promise<Session> {
+  return sessionFrom(
+    await request('/auth/password', {
+      method: 'POST',
+      body: { current_password: currentPassword, new_password: newPassword },
+      csrfToken,
+    }),
+  );
+}
+
+export async function revokeOtherSessions(
+  currentPassword: string,
+  csrfToken: string,
+): Promise<Session> {
+  return sessionFrom(
+    await request('/auth/sessions/revoke', {
+      method: 'POST',
+      body: { current_password: currentPassword },
+      csrfToken,
+    }),
+  );
+}

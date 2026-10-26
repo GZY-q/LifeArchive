@@ -3,7 +3,9 @@
 import hmac
 import math
 from datetime import datetime, timedelta
+from uuid import UUID
 
+from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
@@ -86,18 +88,81 @@ def consume_login_attempt(db: Session) -> None:
 
 
 def authenticate(db: Session, username: str, password: str) -> User | None:
-    user = db.scalar(select(User).limit(1))
-    digest = user.password_hash if user is not None else dummy_password_hash()
-    password_matches = verify_password(digest, password)
-    username_matches = user is not None and hmac.compare_digest(
-        user.username.encode("utf-8"), username.encode("utf-8")
-    )
-    if not username_matches or not password_matches:
-        return None
-    assert user is not None
-    if password_hasher().check_needs_rehash(user.password_hash):
-        user.password_hash = hash_password(password)
-    return user
+    try:
+        # Serialize credential verification and session issuance with rotation.
+        # Refresh an identity-map entry loaded by an earlier authentication read.
+        user = db.scalar(
+            select(User).limit(1).with_for_update().execution_options(populate_existing=True)
+        )
+        digest = user.password_hash if user is not None else dummy_password_hash()
+        password_matches = verify_password(digest, password)
+        username_matches = user is not None and hmac.compare_digest(
+            user.username.encode("utf-8"), username.encode("utf-8")
+        )
+        if not username_matches or not password_matches:
+            db.rollback()
+            return None
+        assert user is not None
+        if password_hasher().check_needs_rehash(user.password_hash):
+            user.password_hash = hash_password(password)
+        return user
+    except Exception:
+        db.rollback()
+        raise
+
+
+def rotate_account_session(
+    db: Session,
+    user_id: UUID,
+    current_token: str,
+    current_password: str,
+    new_password: str | None = None,
+) -> tuple[User, str, datetime]:
+    """Verify fresh credentials, revoke old tokens and issue one replacement atomically."""
+    # Reserve and commit before taking the owner lock; never reverse lock order.
+    consume_login_attempt(db)
+    try:
+        user = db.scalar(
+            select(User)
+            .where(User.id == user_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        if user is None or not valid_session_token(current_token):
+            raise HTTPException(401, "Authentication required")
+        active = db.scalar(
+            select(AuthSession)
+            .where(
+                AuthSession.token_hash == token_digest(current_token),
+                AuthSession.user_id == user.id,
+            )
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        # Read actual time after both locks: logout and lock waits must not
+        # resurrect a revoked/expired credential accepted by an earlier read.
+        now = db.scalar(select(func.clock_timestamp()))
+        assert isinstance(now, datetime)
+        if active is None or active.revoked_at is not None or active.expires_at <= now:
+            raise HTTPException(401, "Authentication required")
+        if not verify_password(user.password_hash, current_password):
+            raise HTTPException(403, {"code": "invalid_current_password"})
+        if new_password is not None:
+            if hmac.compare_digest(current_password.encode("utf-8"), new_password.encode("utf-8")):
+                raise HTTPException(422, {"code": "password_unchanged"})
+            user.password_hash = hash_password(new_password)
+        now = db.scalar(select(func.clock_timestamp()))
+        assert isinstance(now, datetime)
+        db.execute(
+            update(AuthSession)
+            .where(AuthSession.user_id == user.id, AuthSession.revoked_at.is_(None))
+            .values(revoked_at=now)
+        )
+        token, expires_at = create_session(db, user, None)
+        return user, token, expires_at
+    except Exception:
+        db.rollback()
+        raise
 
 
 def create_session(db: Session, user: User, old_token: str | None) -> tuple[str, datetime]:

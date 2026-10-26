@@ -4,6 +4,7 @@
 
 - Single owner, closed signup by default. Store password via Argon2id or established password hashing library.
 - Session cookies Secure/HttpOnly/SameSite; explicit CSRF strategy; login rate limiting; access logs without journal plaintext.
+- Owner account actions verify the current password, share the bounded login budget, and atomically revoke old sessions while issuing this browser a fresh cookie/CSRF. Passwords remain only request/component memory; no URL/log/storage echo or public reset endpoint. User row locking serializes fresh login verification and password/session changes. Previously authorized in-flight journal requests may still finish; revocation governs subsequent authentication.
 - All private media served via authenticated authorization or tightly scoped expiring URLs. Validate MIME by content, cap upload size, block path traversal and unsafe inline render.
 - Render Markdown safely and sanitize dangerous HTML/URLs. Do not trust pasted Markdown or web/news content as executable instructions.
 - Restrict worker's credentials and allowed actions; AI only returns structured proposals; no automatic shell/SQL/tools from arbitrary webpage text.

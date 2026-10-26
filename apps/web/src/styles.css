@@ -1059,3 +1059,22 @@ h2 {
   color: #755417;
   font-size: 12px;
 }
+
+.account-workspace {
+  padding: 28px;
+}
+
+.account-fields {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.account-session-action {
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid #e0e2d9;
+}

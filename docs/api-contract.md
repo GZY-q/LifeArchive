@@ -8,6 +8,9 @@ M1 已实现 health、owner 会话和最小日记闭环；M2 已分片扩展月�
 - `POST /auth/login`：JSON `{username,password}`，必须有可信 `Origin`、`Content-Type: application/json` 和 `X-LifeArchive-Request: 1`。200 返回 `{user:{id,username,timezone},csrf_token}` 并设置 HttpOnly、SameSite=Lax、path=/api/v1 的随机会话 cookie。会话绝对有效期 7 天，数据库仅保存 token 的 SHA-256。未初始化或凭据错误均为通用 401。所有用户名/来源共享每 300 秒 5 次登录尝试预算（含成功），超限 429 / `Retry-After`。
 - `GET /auth/me`：同上会话响应，未认证 401；CSRF token 仅放内存，不放 localStorage。
 - `POST /auth/logout`：可信 `Origin` + `X-CSRF-Token`，撤销会话并清 cookie，204。
+- `POST /auth/password`：JSON `{current_password,new_password}`；`POST /auth/sessions/revoke`：JSON `{current_password}`。两者要求有效会话、可信Origin、X-LifeArchive-Request:1、application/json和CSRF，成功200 AuthResponse+新cookie/CSRF。前者改密、后者只退出其他会话；全部旧token（含当前旧token）在同一事务撤销，当前浏览器换新token接续。
+- 当前密码1–1024字符，新密码15–1024，SecretStr、不trim/归一化，拒绝新密码空白/NUL或与当前相同；无效Unicode拒绝。未知字段/格式错误通用422，新旧相同422/password_unchanged；当前密码错403/invalid_current_password，不清会话。已撤销/过期token401，CSRF/Origin403，非JSON415；不回显密码。
+- 登录与这两个敏感操作共用每300秒5次预算（成功/失败都计数），在hash前持久化预留，超限429+Retry-After；失败不改密码/会话。登录与改密/撤销通过owner行锁串行，锁内刷新密码并复核会话，避免旧hash或已撤销token补建有效会话。撤销不承诺取消早先已鉴权的普通业务在飞请求。
 - 所有日记接口都要求有效会话，写入还要求可信 `Origin` 和本会话的 `X-CSRF-Token`。私密 API 响应，包括错误响应，均 `Cache-Control: no-store`。
 - `POST /entries`：`{content_md,entry_date,client_request_id?,tag_ids?,asset_ids?,is_pinned?}`。新建201，重放200；is_pinned严格布尔，默认false。请求ID对比revision1正文/日期/标签与资产ID集合/置顶状态，不同请求体409/idempotency_conflict，当前软删除重放404。Markdown非空最多100,000字符、不trim；日期严格YYYY-MM-DD。
 - `GET /entries?limit=20&cursor=...&entry_date=...&tag_id=...&order=date`：`{items,next_cursor}`，limit1–100。默认date按日记日期/创建时间/ID降序；pinned模式置顶优先后按原日期排序。日期与单标签过滤AND，游标不能跨过滤/排序复用，未知/越权标签为空列表。
@@ -52,6 +55,12 @@ M1 已实现 health、owner 会话和最小日记闭环；M2 已分片扩展月�
 - 前端置顶写入使用全局busy保护，正在编辑同篇时禁用卡片动作；成功刷新列表、不重挂编辑器。冲突或不确定结果提示刷新核对，不覆盖未保存草稿/图片/冻结UUID/409面板。
 - 0006_journal_pinning为当前/历史增加is_pinned，旧记录false；导出v4增加当前/历史同名字段，原图/清单约定不变。
 
+## 13：账户安全界面
+
+“账户”提供改密和退出其他会话，提交结束/离开清空密码字段，应用不记录密码日志、不写URL或持久存储。写入期间全局busy阻止重复动作/导航/退出。成功将新Session交同owner认证边界，不重挂日记，草稿/图片/冻结UUID/409保留，后续写入用新CSRF。403当前密码错只提示重输；401沿用重新登录与草稿保留。
+
+网络结果不确定不显示成功、不自动重试；敏感表单跨导航保持锁定，先重新验证登录或用新密码重登核对，再允许提交。无公开找回、邮件、重置后门或设备会话列表；无新表/迁移/配置/依赖，head0006、导出v4不变。
+
 ## M2 第一片：月历与日详情
 
 - `GET /calendar?year=YYYY&month=M`：返回 `{year,month,days:[{date,entry_count}]}`。year 为 1–9999，month 为 1–12；days 按日期升序，仅包含有记录的日期，空月为 `[]`。
@@ -88,6 +97,8 @@ This is the intended resource boundary, **not implemented endpoints**. Responses
 | --- | --- | --- |
 | POST | `/auth/login` | owner login |
 | POST | `/auth/logout` | revoke session |
+| POST | `/auth/password` | verify current password, change and rotate all sessions |
+| POST | `/auth/sessions/revoke` | verify current password, replace all sessions with this browser's new session |
 | GET | `/auth/me` | current owner |
 | GET / POST | `/entries` | paginated list, create |
 | GET / POST | `/tags` | private paginated catalog, idempotent name creation |
