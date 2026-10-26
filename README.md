@@ -8,7 +8,7 @@ LifeArchive 是一个独立实现、单用户优先、自托管、面向几十�
 
 - 已完成 M0 基础设施；M1 提供单一 owner 登录、私密会话、日记 CRUD、原文修订历史、补记日期、分页与并发冲突保护。
 - M2 第一片提供月历计数和日期详情，按日记日期查看补记和同日多条记录；原文分页读取，切换视图保留当前草稿。
-- M2 第二片提供归档搜索：中文/英文连续原文、日记日期范围和分页；手动提交，搜索词只放请求体。当前采用字面子串匹配，尚未验证大规模全文索引性能。
+- 归档搜索支持中文/英文连续原文、日记日期范围、单标签组合条件与分页，也可只按标签查找；手动提交，条件只放请求体。当前采用字面子串匹配，尚未验证大规模全文索引性能。见 [10 工单](tasks/10-archive-tag-filter.md) 与 [交接](docs/archive-tag-filter-handoff.md)。
 - M2 第三片提供“往年这一天”：在日历选择日期并展开，分页查看以前年份同月同日的原文；闰日严格匹配，切换日期或刷新重新读取。
 - 提供只读日记导出 CLI：原始 Markdown、JSON 元数据、所选日记全部修订与 SHA-256 清单；可显式包含软删除记录，拒绝覆盖已有目标。
 - 提供隔离恢复演练脚本：新建合成源和空目标，验证 PG dump/restore、原文/修订/导出一致性和重启后读取；完整自动化加密备份仍待后续。
@@ -202,6 +202,7 @@ tasks/            严格按顺序执行的里程碑工单
 - `tasks/07-editor-compatibility.md` — 真实输入法验收（进行中，不能用模拟事件代替真机）
 - `tasks/08-journal-tags.md` — 日记标签、列表筛选、标签历史及导出 v2
 - `tasks/09-journal-trash.md` — 回收站查看、原子恢复与草稿保护
+- `tasks/10-archive-tag-filter.md` — 归档标签组合条件与私密分页
 - `docs/next-steps.md` — 依赖顺序、验收状态与接手提示词
 - `docs/decisions.md` — 核心技术决策
 - `docs/m0-handoff.md` — M0 实现边界、代码入口和 M1 交接
@@ -218,6 +219,7 @@ tasks/            严格按顺序执行的里程碑工单
 - `docs/export-format.md` — 可移植格式 v2、v1 阅读说明及独立哈希核验
 - `docs/journal-tags-handoff.md` — 标签实现、必要检查结果与后续入口
 - `docs/journal-trash-handoff.md` — 回收站实现、运行方式与后续入口
+- `docs/archive-tag-filter-handoff.md` — 归档标签条件、兼容约定和交接
 - `docs/journal-export-handoff.md` — 导出实现入口、错误边界和后续交接
 - `docs/journal-export-acceptance.md` — 导出实际验收证据
 

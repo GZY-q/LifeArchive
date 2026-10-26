@@ -47,7 +47,7 @@ describe('private archive search', () => {
     await openArchive();
     await submit();
     expect(screen.getByRole('alert')).toHaveTextContent(
-      '请输入关键词，或至少选择一个日记日期。',
+      '请输入关键词，或至少选择一个日记日期或标签。',
     );
     query('中文');
     expect(bodies).toHaveLength(0);

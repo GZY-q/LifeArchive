@@ -37,6 +37,8 @@ docker compose exec -T api alembic current
 
 已复用原开发库和 owner，仅重启开发 API 加载本片代码，18088 健康接口正常、未认证回收站为 401。没有对预览库执行删除/恢复测试操作，也没有迁移或重置数据。不要引用标签提交的 CI 结果替代本片证据。
 
+后续只读查询确认：提交 `7e5a4ff88e1f06c44d9da884bb2d8b3104ef5e21` 的 [自动 CI 40214450410](https://github.com/GZY-q/LifeArchive/actions/runs/40214450410) 已成功。本机未追加全量运行；此结果只属于09，不代表10标签筛选。
+
 最小复核命令（PG 环境通过私密配置注入，缺配置的 skip 不等于通过）：
 
 ```bash
