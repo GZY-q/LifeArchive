@@ -1,6 +1,6 @@
 # 15 标签改名交接
 
-范围见 [15工单](../tasks/15-tag-renaming.md)。从`codex/markdown-preview`的`0a1a9bc938ce50431f5d412ccd9a75cbc72a56bf`堆叠到`codex/tag-renaming`；前序PR不自动合并。保留现有用户数据与18086旧输入法环境，07真机矩阵仍待人工证据。
+范围见 [15工单](../tasks/15-tag-renaming.md)，交付 [PR #16](https://github.com/GZY-q/LifeArchive/pull/16)。从`codex/markdown-preview`的`0a1a9bc938ce50431f5d412ccd9a75cbc72a56bf`堆叠到`codex/tag-renaming`，依赖 PR #15；前序PR不自动合并。保留现有用户数据与18086旧输入法环境，07真机矩阵仍待人工证据。
 
 ## 使用和运行
 

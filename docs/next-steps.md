@@ -23,7 +23,7 @@
 | 12 日记置顶 | [PR #13](https://github.com/GZY-q/LifeArchive/pull/13)，`codex/journal-pinning`；[交接](journal-pinning-handoff.md)，该提交自动CI已通过 | PR #12修正提交b2eef67 |
 | 13 账户安全 | [PR #14](https://github.com/GZY-q/LifeArchive/pull/14)，`codex/account-security`；[交接](account-security-handoff.md)，该提交自动CI已通过 | PR #13 |
 | 14 安全Markdown预览 | [PR #15](https://github.com/GZY-q/LifeArchive/pull/15)，`codex/markdown-preview`；[交接](markdown-preview-handoff.md)，该提交自动CI已通过 | PR #14 |
-| 15 标签改名 | `codex/tag-renaming`；[交接](tag-renaming-handoff.md) | PR #15 |
+| 15 标签改名 | [PR #16](https://github.com/GZY-q/LifeArchive/pull/16)，`codex/tag-renaming`；[交接](tag-renaming-handoff.md) | PR #15 |
 
 先审阅 PR #2，再审阅 PR #3，再审阅搜索 PR #4、往年今日 PR #5、导出 PR #6、恢复演练 PR #7 和输入法验收 PR #8；每个依赖合入后重新核对后继 PR 的 base、差异和 CI，避免重复提交前一片内容。合并、重写已推送历史和清理旧数据不属于这份计划的自动动作。未经用户明确授权不自行合并。
 
