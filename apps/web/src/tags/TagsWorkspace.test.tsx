@@ -49,6 +49,9 @@ describe('tag renaming', () => {
       return undefined;
     });
     render(<App />);
+    await userEvent.click(
+      await screen.findByRole('button', { name: '标签与图片' }),
+    );
     const editor = await screen.findByLabelText('日记内容');
     await userEvent.click(
       await screen.findByRole('checkbox', { name: '生活' }),

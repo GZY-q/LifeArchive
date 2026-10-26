@@ -1,42 +1,5 @@
-import { HealthIndicator } from './components/HealthIndicator';
 import { AuthGate } from './auth/AuthGate';
 
 export function App() {
-  return (
-    <div className="app-shell">
-      <a className="skip-link" href="#main">
-        跳到主要内容
-      </a>
-      <aside className="sidebar">
-        <a className="brand" href="/" aria-label="LifeArchive 首页">
-          <span className="brand-mark" aria-hidden="true">
-            L<span>.</span>
-          </span>
-          <span>
-            <strong>LifeArchive</strong>
-            <span className="brand-caption">生活，自有回响。</span>
-          </span>
-        </a>
-
-        <div className="sidebar-footer">
-          <HealthIndicator />
-          <p className="edition">LIFEARCHIVE</p>
-        </div>
-      </aside>
-
-      <main id="main" className="main-content" tabIndex={-1}>
-        <header className="page-header">
-          <span>你的私人生活档案</span>
-          <span className="version-label">记录与回望</span>
-        </header>
-
-        <AuthGate />
-
-        <footer className="page-footer">
-          <span>属于你的记录，由你珍藏。</span>
-          <span aria-hidden="true">✳</span>
-        </footer>
-      </main>
-    </div>
-  );
+  return <AuthGate />;
 }

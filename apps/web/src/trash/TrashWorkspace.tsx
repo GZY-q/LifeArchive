@@ -143,7 +143,6 @@ export function TrashWorkspace({
     <section className="trash-workspace" aria-labelledby="trash-title">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">KEEP WHAT MATTERS</p>
           <h2 id="trash-title">回收站</h2>
         </div>
         <button

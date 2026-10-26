@@ -116,6 +116,9 @@ describe('archive tag filters', () => {
     });
     render(<App />);
     await screen.findByLabelText('日记内容');
+    await userEvent.click(
+      await screen.findByRole('button', { name: '标签与图片' }),
+    );
     await screen.findByRole('checkbox', { name: '生活' });
     failCatalog = true;
     await userEvent.click(screen.getByRole('button', { name: '归档' }));

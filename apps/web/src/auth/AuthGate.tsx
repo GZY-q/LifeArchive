@@ -14,6 +14,17 @@ import { LoginForm } from './LoginForm';
 import { AccountWorkspace } from './AccountWorkspace';
 import { TagsWorkspace } from '../tags/TagsWorkspace';
 import { ExportWorkspace } from '../export/ExportWorkspace';
+import { AppFrame } from '../components/AppFrame';
+import { AppIcon } from '../components/AppIcon';
+
+const destinations = [
+  { id: 'journal', label: '日记' },
+  { id: 'calendar', label: '日历' },
+  { id: 'archive', label: '归档' },
+  { id: 'trash', label: '回收站' },
+  { id: 'tags', label: '标签管理' },
+  { id: 'export', label: '导出' },
+] as const;
 
 export function AuthGate() {
   const [session, setSession] = useState<Session | null>(null);
@@ -134,13 +145,15 @@ export function AuthGate() {
 
   if (loading)
     return (
-      <p className="state-message" role="status">
-        正在确认登录状态…
-      </p>
+      <AppFrame>
+        <p className="state-message" role="status">
+          正在确认登录状态…
+        </p>
+      </AppFrame>
     );
   if (!session) {
     return (
-      <>
+      <AppFrame>
         {expired && (
           <p className="notice" role="alert">
             登录已失效。
@@ -167,106 +180,78 @@ export function AuthGate() {
         ) : (
           <LoginForm onLogin={acceptLogin} />
         )}
-      </>
+      </AppFrame>
     );
   }
 
-  return (
-    <>
-      <div className="account-bar">
-        <span>
-          {session.user.username}{' '}
-          <span className="small-note">· {session.user.timezone}</span>
-        </span>
-        <div>
-          <button
-            type="button"
-            className="text-button"
-            aria-current={view === 'account' ? 'page' : undefined}
-            disabled={signingOut || writeBusy || revalidating}
-            onClick={() => setView('account')}
-          >
-            账户
-          </button>{' '}
-          <button
-            type="button"
-            className="text-button"
-            disabled={signingOut || writeBusy || revalidating}
-            onClick={() => void revalidateSession()}
-          >
-            {revalidating ? '正在验证…' : '重新验证登录'}
-          </button>{' '}
-          <button
-            type="button"
-            className="text-button"
-            disabled={signingOut || writeBusy || revalidating}
-            onClick={() => void signOut()}
-          >
-            {signingOut ? '正在退出…' : '退出登录'}
-          </button>
-        </div>
+  const account = (
+    <div className="account-bar">
+      <span>
+        {session.user.username}{' '}
+        <span className="small-note">· {session.user.timezone}</span>
+      </span>
+      <div>
+        <button
+          type="button"
+          className="text-button"
+          aria-current={view === 'account' ? 'page' : undefined}
+          disabled={signingOut || writeBusy || revalidating}
+          onClick={() => setView('account')}
+        >
+          账户
+        </button>{' '}
+        <button
+          type="button"
+          className="text-button"
+          disabled={signingOut || writeBusy || revalidating}
+          onClick={() => void revalidateSession()}
+        >
+          {revalidating ? '正在验证…' : '重新验证登录'}
+        </button>{' '}
+        <button
+          type="button"
+          className="text-button"
+          disabled={signingOut || writeBusy || revalidating}
+          onClick={() => void signOut()}
+        >
+          {signingOut ? '正在退出…' : '退出登录'}
+        </button>
       </div>
+    </div>
+  );
+  const navigation = (
+    <nav className="workspace-navigation" aria-label="主导航">
+      {destinations.map(({ id, label }) => (
+        <button
+          key={id}
+          type="button"
+          className={`nav-item ${view === id ? 'selected' : ''}`}
+          aria-current={view === id ? 'page' : undefined}
+          disabled={signingOut || revalidating || writeBusy}
+          onClick={() => setView(id)}
+        >
+          <AppIcon name={id} />
+          {label}
+        </button>
+      ))}
+    </nav>
+  );
+
+  return (
+    <AppFrame
+      navigation={navigation}
+      account={account}
+      title={
+        view === 'account'
+          ? '账户'
+          : destinations.find(({ id }) => id === view)?.label
+      }
+    >
       {error && (
         <p className="error-message" role="alert">
           {error}
         </p>
       )}
-      <nav className="workspace-navigation" aria-label="主导航">
-        <button
-          type="button"
-          className={`nav-item ${view === 'journal' ? 'selected' : ''}`}
-          aria-current={view === 'journal' ? 'page' : undefined}
-          disabled={signingOut || revalidating || writeBusy}
-          onClick={() => setView('journal')}
-        >
-          日记
-        </button>
-        <button
-          type="button"
-          className={`nav-item ${view === 'calendar' ? 'selected' : ''}`}
-          aria-current={view === 'calendar' ? 'page' : undefined}
-          disabled={signingOut || revalidating || writeBusy}
-          onClick={() => setView('calendar')}
-        >
-          日历
-        </button>
-        <button
-          type="button"
-          className={`nav-item ${view === 'archive' ? 'selected' : ''}`}
-          aria-current={view === 'archive' ? 'page' : undefined}
-          disabled={signingOut || revalidating || writeBusy}
-          onClick={() => setView('archive')}
-        >
-          归档
-        </button>
-        <button
-          type="button"
-          className={`nav-item ${view === 'trash' ? 'selected' : ''}`}
-          aria-current={view === 'trash' ? 'page' : undefined}
-          disabled={signingOut || revalidating || writeBusy}
-          onClick={() => setView('trash')}
-        >
-          回收站
-        </button>
-        <button
-          type="button"
-          className={`nav-item ${view === 'tags' ? 'selected' : ''}`}
-          aria-current={view === 'tags' ? 'page' : undefined}
-          disabled={signingOut || revalidating || writeBusy}
-          onClick={() => setView('tags')}
-        >
-          标签管理
-        </button>
-        <button
-          type="button"
-          className={`nav-item ${view === 'export' ? 'selected' : ''}`}
-          aria-current={view === 'export' ? 'page' : undefined}
-          disabled={signingOut || revalidating || writeBusy}
-          onClick={() => setView('export')}
-        >
-          导出
-        </button>
-      </nav>
       {draft && (
         <div hidden={view !== 'journal'}>
           <JournalWorkspace
@@ -335,6 +320,6 @@ export function AuthGate() {
           disabled={signingOut || revalidating}
         />
       )}
-    </>
+    </AppFrame>
   );
 }

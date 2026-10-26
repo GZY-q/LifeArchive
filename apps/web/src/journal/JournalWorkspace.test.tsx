@@ -45,6 +45,9 @@ describe('journal workflow', () => {
     fireEvent.change(await screen.findByLabelText('日记内容'), {
       target: { value: '今天散步' },
     });
+    await userEvent.click(
+      await screen.findByRole('button', { name: '标签与图片' }),
+    );
     fireEvent.change(screen.getByLabelText('新标签名称'), {
       target: { value: '生活' },
     });
@@ -89,6 +92,9 @@ describe('journal workflow', () => {
     render(<App />);
     const editor = await screen.findByLabelText('日记内容');
     fireEvent.change(editor, { target: { value: '尚未保存的草稿' } });
+    await userEvent.click(
+      await screen.findByRole('button', { name: '标签与图片' }),
+    );
     await userEvent.click(
       await screen.findByRole('checkbox', { name: '生活' }),
     );

@@ -30,6 +30,9 @@ describe('journal Markdown preview integration', () => {
       return undefined;
     });
     render(<App />);
+    await userEvent.click(
+      await screen.findByRole('button', { name: '标签与图片' }),
+    );
     const editor = await screen.findByLabelText('日记内容');
     fireEvent.change(editor, { target: { value: raw } });
     fireEvent.compositionStart(editor);
