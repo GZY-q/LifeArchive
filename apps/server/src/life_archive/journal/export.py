@@ -12,7 +12,7 @@ from uuid import UUID
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 from alembic.runtime.migration import MigrationContext
-from sqlalchemy import select
+from sqlalchemy import Select, func, select
 from sqlalchemy.engine import Connection, Engine
 
 from life_archive.auth.models import User
@@ -52,6 +52,17 @@ ASSET_EXTENSIONS = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp
 
 class ExportError(Exception):
     """A fixed, safe-to-display failure reason; never include source data or SQL."""
+
+
+class ExportLimitError(ExportError):
+    """The browser's bounded export was exceeded; CLI exports remain available."""
+
+
+@dataclass(frozen=True)
+class ExportLimits:
+    entries: int = 1000
+    revisions: int = 5000
+    tags: int = 2000
 
 
 class FileRecord(TypedDict):
@@ -158,20 +169,48 @@ def _write_assets(
     return files
 
 
-def _write_snapshot(connection: Connection, archive: ZipFile, include_deleted: bool) -> Manifest:
+def _check_limits(
+    connection: Connection, entries: Select, owner_id: UUID, limits: ExportLimits
+) -> None:
+    selected = entries.with_only_columns(Entry.id)
+    for statement, maximum in (
+        (selected, limits.entries),
+        (
+            select(EntryRevision.id).where(EntryRevision.entry_id.in_(selected)),
+            limits.revisions,
+        ),
+        (select(Tag.id).where(Tag.user_id == owner_id), limits.tags),
+    ):
+        # Stop counting as soon as the limit is exceeded, within the same snapshot.
+        count = connection.scalar(
+            select(func.count()).select_from(statement.limit(maximum + 1).subquery())
+        )
+        if count is not None and count > maximum:
+            raise ExportLimitError("Browser export limit exceeded; use the export CLI")
+
+
+def _write_snapshot(
+    connection: Connection,
+    archive: ZipFile,
+    include_deleted: bool,
+    *,
+    owner_id: UUID | None = None,
+    limits: ExportLimits | None = None,
+) -> Manifest:
     heads = MigrationContext.configure(connection).get_current_heads()
     if len(heads) != 1:
         raise ExportError("Database migrations are missing or ambiguous")
-    owner = (
-        connection.execute(select(User.id, User.username, User.timezone, User.created_at))
-        .mappings()
-        .one_or_none()
-    )
+    owner_query = select(User.id, User.username, User.timezone, User.created_at)
+    if owner_id is not None:
+        owner_query = owner_query.where(User.id == owner_id)
+    owner = connection.execute(owner_query).mappings().one_or_none()
     if owner is None:
         raise ExportError("Owner has not been initialized")
     entries = select(Entry.__table__).where(Entry.user_id == owner["id"])
     if not include_deleted:
         entries = entries.where(Entry.deleted_at.is_(None))
+    if limits is not None:
+        _check_limits(connection, entries, owner["id"], limits)
     files: list[FileRecord] = []
     entry_count = revision_count = 0
     selected_assets: set[UUID] = set()
@@ -253,6 +292,31 @@ def _verify_written_archive(file: BinaryIO, manifest: Manifest) -> None:
                 raise ExportError("Export content verification failed")
 
 
+def write_journal_archive(
+    engine: Engine,
+    file: BinaryIO,
+    *,
+    include_deleted: bool = False,
+    owner_id: UUID | None = None,
+    limits: ExportLimits | None = None,
+) -> Manifest:
+    """Write and fully verify one independent read-only snapshot into a seekable file."""
+    # Never borrow an authentication Session whose snapshot may already have begun.
+    with engine.connect().execution_options(
+        isolation_level="REPEATABLE READ", postgresql_readonly=True
+    ) as connection:
+        with connection.begin():
+            if limits is not None:
+                connection.exec_driver_sql("SET LOCAL statement_timeout = '3000ms'")
+            with ZipFile(file, "w", compression=ZIP_DEFLATED) as archive:
+                manifest = _write_snapshot(
+                    connection, archive, include_deleted, owner_id=owner_id, limits=limits
+                )
+    file.flush()
+    _verify_written_archive(file, manifest)
+    return manifest
+
+
 def export_journal(engine: Engine, output: Path, *, include_deleted: bool = False) -> ExportResult:
     """Create a new private ZIP, retaining incomplete output on failure for inspection."""
     if not output.is_absolute():
@@ -261,14 +325,6 @@ def export_journal(engine: Engine, output: Path, *, include_deleted: bool = Fals
     descriptor = os.open(output, flags, 0o600)
     with os.fdopen(descriptor, "w+b") as file:
         os.fchmod(file.fileno(), 0o600)
-        # Set transaction characteristics before ANY source query. Never borrow an
-        # authentication Session whose transaction/snapshot may already have begun.
-        with engine.connect().execution_options(
-            isolation_level="REPEATABLE READ", postgresql_readonly=True
-        ) as connection:
-            with connection.begin(), ZipFile(file, "w", compression=ZIP_DEFLATED) as archive:
-                manifest = _write_snapshot(connection, archive, include_deleted)
-        file.flush()
+        manifest = write_journal_archive(engine, file, include_deleted=include_deleted)
         os.fsync(file.fileno())
-        _verify_written_archive(file, manifest)
     return ExportResult(output, manifest["entry_count"], manifest["revision_count"])

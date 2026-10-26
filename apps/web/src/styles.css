@@ -1093,7 +1093,8 @@ h2 {
   background: #fafbf6;
 }
 
-.tags-workspace {
+.tags-workspace,
+.export-workspace {
   min-width: 0;
   padding: 24px;
 }
@@ -1128,4 +1129,16 @@ h2 {
   border-radius: 8px;
   background: #fff;
   font: inherit;
+}
+
+.export-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-block: 20px;
+}
+
+.export-download {
+  margin-top: 20px;
+  overflow-wrap: anywhere;
 }

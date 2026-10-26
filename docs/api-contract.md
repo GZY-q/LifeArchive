@@ -75,6 +75,15 @@ M1 已实现 health、owner 会话和最小日记闭环；M2 已分片扩展月�
 - 前端“标签”页显式保存；忙碌时阻止重复请求、导航和退出。冲突或网络/5xx结果不确定时保留输入、阻断直接重试，先重新读取目录再显式编辑。管理页目录核对与成功改名刷新仍挂载的日记目录/列表，不重挂载编辑器或重置草稿/标签ID/冻结UUID/409；其他视图再次进入时重读。归档仍须显式搜索，摘要绑定已提交条件。
 - expected_name用于防止陈旧名称覆盖，不是单调版本号；A→B→A不能检测。无标签删除/合并/层级，不回写任何历史名称。
 
+## 16：网页日记导出
+
+- `POST /journal-export`：严格 JSON `{include_deleted?: boolean}`，默认 false，拒绝字符串布尔、null 和额外字段。仅接受该选项，不接受 owner/路径/文件名；会话、可信 Origin、JSON、X-LifeArchive-Request:1、CSRF 均必需。GET 不生成导出。
+- 成功200 `application/zip`、`Content-Disposition: attachment; filename="life-archive-journal.zip"`、nosniff、no-store。复用 v4 原文/元数据、所选全部修订与历史/当前原图、完整目录及 SHA-256 清单；默认仅活动日记，可显式包含软删除。草稿、未关联上传、认证、配置不包含。
+- 认证 owner ID 显式限定独立 `REPEATABLE READ, READ ONLY` 快照，数量预检也在该快照内；完整关闭 ZIP 并复核所有哈希后才发送附件。没有数据库写入、服务端导出文件、任务 ID、公开下载 URL 或自动重试。
+- 网页限额：1000篇所选日记、5000条所选修订、2000个目录标签、32MiB压缩ZIP；超限413/export_too_large，不截断。每API进程单个生成/响应名额，忙碌429/export_busy并含Retry-After:5；不是跨进程限流。
+- 生成/校验30秒协作式时限，每SQL 3秒；超时504/export_timeout。媒体缺失/损坏、数据库或导出校验失败503/export_unavailable。错误为通用JSON、no-store，无附件头，不回显原文、名称、SQL或路径。CLI不受网页限额影响。
+- 前端45秒读取超时，成功后使用仅本页面生命周期的Blob URL供显式下载；选项变化、重新生成、离开页面或退出会话撤销旧链接。取消仅中止浏览器读取，已开始的同步服务端导出可能运行至完成/时限。日记编辑器、草稿、附件、冻结创建UUID和409状态保持；无迁移，导出仍v4。
+
 ## M2 第一片：月历与日详情
 
 - `GET /calendar?year=YYYY&month=M`：返回 `{year,month,days:[{date,entry_count}]}`。year 为 1–9999，month 为 1–12；days 按日期升序，仅包含有记录的日期，空月为 `[]`。
@@ -117,6 +126,7 @@ This is the intended resource boundary, **not implemented endpoints**. Responses
 | GET / POST | `/entries` | paginated list, create |
 | GET / POST | `/tags` | private paginated catalog, idempotent name creation |
 | PATCH | `/tags/{id}` | rename with exact expected name; retain IDs and historical snapshots |
+| POST | `/journal-export` | authenticated, bounded, verified v4 ZIP; optional deleted entries |
 | GET / PATCH / DELETE | `/entries/{id}` | detail, edit, trash |
 | GET | `/entries/{id}/revisions` | version audit |
 | POST | `/entries/{id}/restore` | recover soft-deleted |

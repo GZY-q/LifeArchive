@@ -13,6 +13,7 @@ import { TrashWorkspace } from '../trash/TrashWorkspace';
 import { LoginForm } from './LoginForm';
 import { AccountWorkspace } from './AccountWorkspace';
 import { TagsWorkspace } from '../tags/TagsWorkspace';
+import { ExportWorkspace } from '../export/ExportWorkspace';
 
 export function AuthGate() {
   const [session, setSession] = useState<Session | null>(null);
@@ -25,7 +26,7 @@ export function AuthGate() {
   const [writeBusy, setWriteBusy] = useState(false);
   const [revalidating, setRevalidating] = useState(false);
   const [view, setView] = useState<
-    'journal' | 'calendar' | 'archive' | 'trash' | 'account' | 'tags'
+    'journal' | 'calendar' | 'archive' | 'trash' | 'account' | 'tags' | 'export'
   >('journal');
   const [calendarDate, setCalendarDate] = useState<string | null>(null);
   const [searchForm, setSearchForm] = useState(emptySearchForm);
@@ -256,6 +257,15 @@ export function AuthGate() {
         >
           标签管理
         </button>
+        <button
+          type="button"
+          className={`nav-item ${view === 'export' ? 'selected' : ''}`}
+          aria-current={view === 'export' ? 'page' : undefined}
+          disabled={signingOut || revalidating || writeBusy}
+          onClick={() => setView('export')}
+        >
+          导出
+        </button>
       </nav>
       {draft && (
         <div hidden={view !== 'journal'}>
@@ -315,6 +325,13 @@ export function AuthGate() {
           onExpired={expire}
           onBusy={setWriteBusy}
           onCatalogue={refreshCatalogue}
+          disabled={signingOut || revalidating}
+        />
+      )}
+      {view === 'export' && (
+        <ExportWorkspace
+          csrfToken={session.csrf_token}
+          onExpired={expire}
           disabled={signingOut || revalidating}
         />
       )}

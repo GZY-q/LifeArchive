@@ -29,6 +29,8 @@ Task14 adds only a derived client-side Markdown view. Rendered HTML/preview pref
 
 Task15 reuses Tag's owner/name-key uniqueness and locks the owner-scoped tag row before comparing the exact expected display name. Renaming changes only name/name_key; id/created_at, EntryTag associations, journal fields and revision numbers do not change. Current entries resolve the current directory name, while existing revision JSONB name snapshots remain immutable. Subsequent journal snapshots capture the name visible to that write transaction; renaming does not create journal revisions. Creation replay remains based on tag IDs. The name comparison detects stale names but is not a monotonic version counter (an A→B→A cycle is indistinguishable); no migration or export-format bump is introduced.
 
+Task16 exposes the same v4 archive through an authenticated bounded HTTP export. A new independent read-only repeatable-read connection scopes the owner explicitly, checks selected entry/revision counts and the complete tag catalogue, then writes and verifies the same members as the CLI. Browser output stays in bounded memory; there is no export table, persisted archive, journal revision, migration or format change. CLI exclusive file creation and incomplete-file retention remain separate from the HTTP response lifecycle.
+
 ## News
 
 - `news_sources`: feed/API config, enabled, license notes.

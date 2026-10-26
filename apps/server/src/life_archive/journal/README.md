@@ -70,3 +70,15 @@ Tests under `tests/journal` use the shared real-PostgreSQL fixtures, including
 simultaneous creation and edits. Run with the test database configuration from
 the server README. For the focused tag checks:
 `uv run --locked pytest tests/journal/test_tags.py tests/journal/test_migrations.py`.
+
+Task16 mounts `export_router.router` at `/api/v1/journal-export`. POST accepts only
+an optional strict boolean `include_deleted` (default false) with owner/Origin/JSON/
+custom-header/CSRF checks. `write_journal_archive` shares the CLI's independent
+read-only repeatable-read snapshot and full archive verification, explicitly scoped
+to the authenticated owner. HTTP uses a 32 MiB bounded memory buffer, 1000 selected
+entries/5000 revisions/2000 catalogue tags, a cooperative 30-second deadline and
+3-second SQL statement timeout. One process-local slot spans generation and ASGI
+response delivery; busy requests fail 429, limits 413, deadlines 504 and unavailable
+media/database/verification 503. Failure returns no attachment or filesystem path.
+No migration, jobs, server export files or format bump; CLI keeps its exclusive 0600
+file and incomplete-file retention contract without browser limits.

@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from life_archive.auth.errors import validation_exception_handler
 from life_archive.auth.router import router as auth_router
+from life_archive.journal.export_router import router as export_router
 from life_archive.journal.router import router as journal_router
 from life_archive.journal.tag_router import router as tag_router
 from life_archive.journal.trash_router import router as trash_router
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.include_router(auth_router, prefix="/api/v1")
     app.include_router(journal_router, prefix="/api/v1")
+    app.include_router(export_router, prefix="/api/v1")
     app.include_router(tag_router, prefix="/api/v1")
     app.include_router(trash_router, prefix="/api/v1")
     app.include_router(media_router, prefix="/api/v1")
