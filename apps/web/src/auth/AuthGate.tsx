@@ -11,6 +11,7 @@ import { ArchiveWorkspace } from '../search/ArchiveWorkspace';
 import { emptySearchForm } from '../search/form';
 import { TrashWorkspace } from '../trash/TrashWorkspace';
 import { LoginForm } from './LoginForm';
+import { AccountWorkspace } from './AccountWorkspace';
 
 export function AuthGate() {
   const [session, setSession] = useState<Session | null>(null);
@@ -23,11 +24,12 @@ export function AuthGate() {
   const [writeBusy, setWriteBusy] = useState(false);
   const [revalidating, setRevalidating] = useState(false);
   const [view, setView] = useState<
-    'journal' | 'calendar' | 'archive' | 'trash'
+    'journal' | 'calendar' | 'archive' | 'trash' | 'account'
   >('journal');
   const [calendarDate, setCalendarDate] = useState<string | null>(null);
   const [searchForm, setSearchForm] = useState(emptySearchForm);
   const [journalRefresh, setJournalRefresh] = useState(0);
+  const [securityUncertain, setSecurityUncertain] = useState(false);
   const ownerId = useRef<string | null>(null);
 
   useEffect(() => {
@@ -68,6 +70,7 @@ export function AuthGate() {
     }
     ownerId.current = current.user.id;
     setSession(current);
+    setSecurityUncertain(false);
     setExpired(false);
     setError('');
   }
@@ -115,6 +118,7 @@ export function AuthGate() {
     }
     setSession(null);
     setDraft(null);
+    setSecurityUncertain(false);
     ownerId.current = null;
     setExpired(false);
     setCalendarDate(null);
@@ -169,6 +173,15 @@ export function AuthGate() {
           <span className="small-note">· {session.user.timezone}</span>
         </span>
         <div>
+          <button
+            type="button"
+            className="text-button"
+            aria-current={view === 'account' ? 'page' : undefined}
+            disabled={signingOut || writeBusy || revalidating}
+            onClick={() => setView('account')}
+          >
+            账户
+          </button>{' '}
           <button
             type="button"
             className="text-button"
@@ -269,6 +282,17 @@ export function AuthGate() {
           onBusy={setWriteBusy}
           onRestored={() => setJournalRefresh((value) => value + 1)}
           disabled={signingOut || revalidating}
+        />
+      )}
+      {view === 'account' && (
+        <AccountWorkspace
+          session={session}
+          disabled={signingOut || revalidating}
+          uncertain={securityUncertain}
+          onSession={acceptLogin}
+          onUncertain={() => setSecurityUncertain(true)}
+          onExpired={expire}
+          onBusy={setWriteBusy}
         />
       )}
     </>

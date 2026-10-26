@@ -47,6 +47,10 @@ Python 固定为 `.python-version` 的 3.12.14，uv 固定为 `pyproject.toml` �
 
 业务服务显式管理提交和回滚；`get_db_session()` 只负责关闭连接和回滚未提交事务，绝不自动提交。认证查询可能已经开启事务，不要在 journal 服务再嵌套 `session.begin()`。同步数据库访问应放在普通 `def` 路由/依赖中，避免阻塞异步事件循环。表结构只经 Alembic 修改，不在 API 启动时执行 `create_all()` 或自动迁移。
 
+## 账户安全
+
+13账户安全提供当前密码验证后的改密/退出其他会话，成功原子撤销旧token并换新cookie/CSRF；复用原预算，无迁移/依赖。普通登录和敏感操作按owner行锁读取新hash，敏感操作再锁当前session并按实际DB时钟复核，防并发登录/注销复活旧凭据。后台不修改已有密码，会话撤销只在显式请求执行；不提供公开找回或重置后门。运行与错误边界见`docs/account-security-handoff.md`。
+
 ## 导出 CLI
 
 从仓库根目录，已有实例运行 `docker compose exec -T api python -m life_archive.cli export-journal --output /tmp/new-journal.zip`。本机从 apps/server 使用 `uv run --locked python -m life_archive.cli export-journal --output /absolute/new-journal.zip`，复用数据库环境配置。默认仅活动日记和全部修订；新路径配合 `--include-deleted` 包含软删除记录。绝对新路径、已存在父目录、0600、只读一致性和禁止覆盖为固定约定；无 HTTP 导出接口或任务队列。详见格式文档和交接；不将可阅读导出称为整个部署的可恢复备份。

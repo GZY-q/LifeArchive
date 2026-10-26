@@ -23,6 +23,8 @@ Task 11 applies `0005_private_images`, adds the asset tables and `entry_revision
 
 Task12 adds `0006_journal_pinning`: current and historical is_pinned default false, plus an active owner/pin/date/created/id index. Pin updates share revision CAS, preserve archive dates and create snapshots. Only explicit `order=pinned` journal lists group pins first; calendar/day/search/on-this-day keep date semantics. Cursors bind the order, old date cursors remain compatible. Soft delete/restore retains pin state; creation replay compares revision1's pin value. Portable format v4 exports current/historical pin state without changing media paths.
 
+Task13 reuses User/AuthSession/LoginThrottle with no migration. Password change and session revocation reserve the existing shared attempt budget before acquiring the User lock. They refresh the locked owner, recheck the requesting session against the current database clock, verify the password, then commit the hash update (if any), old-session revocation, and new opaque session atomically. Login also holds the owner lock from fresh password verification through session commit to prevent stale authentication/rehash races. Revoked rows remain recorded; no plaintext credentials or original tokens are stored. Journal data and portable export are unaffected.
+
 ## News
 
 - `news_sources`: feed/API config, enabled, license notes.

@@ -38,6 +38,8 @@ head为`0006_journal_pinning`：Entry/EntryRevision新增Boolean is_pinned、旧
 - `npm run typecheck`、`npm run lint`及`src/journal/Pinning.test.tsx`2项通过（791毫秒）；修改文件已格式化。覆盖写锁、取消旧分页、冻结图片草稿/UUID保留、冲突及不确定结果刷新；整合还阻止外部恢复刷新尚未完成时置顶，避免错误后刷新按钮卡住。
 - 独立开发库0006迁移成功，18088健康接口正常。前序媒体修正的CI通过仅证明11，不当作本片CI证据。
 
+后续只读查询确认：置顶提交`9a72e2cfde407664380424fad56196bc4ae4d470`的[CI 40267771053](https://github.com/GZY-q/LifeArchive/actions/runs/40267771053)已全部成功。本机没有追加全量运行；此结果只属于12，不代表后续账户安全功能。
+
 最小复核（PG配置私密注入TEST_POSTGRES_*）：
 
 ```bash
