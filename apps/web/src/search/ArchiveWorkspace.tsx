@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 
+import { MarkdownContent } from '../components/MarkdownContent';
+
 import { errorMessage, isUnauthorized } from '../api/client';
 import type { Entry } from '../api/journal';
 import { searchEntries } from '../api/search';
@@ -292,7 +294,11 @@ export function ArchiveWorkspace({
                 {' · '}版本 {entry.revision}
               </p>
               <PinnedBadge isPinned={entry.is_pinned} />
-              <pre className="markdown-text">{entry.content_md}</pre>
+              <MarkdownContent
+                content={entry.content_md}
+                label={`${entry.entry_date} 搜索原文与预览`}
+                disabled={disabled}
+              />
               <TagBadges tags={entry.tags} />
               <AssetGallery assets={entry.assets} onExpired={onExpired} />
             </article>

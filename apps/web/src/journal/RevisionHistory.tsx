@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 
+import { MarkdownContent } from '../components/MarkdownContent';
+
 import { errorMessage, isUnauthorized } from '../api/client';
 import { listRevisions } from '../api/journal';
 import type { EntryRevision } from '../api/journal';
@@ -70,7 +72,10 @@ export function RevisionHistory({
             版本 {revision.revision} · 日记日期 {revision.entry_date}
           </p>
           <PinnedBadge isPinned={revision.is_pinned} />
-          <pre className="markdown-text">{revision.content_md}</pre>
+          <MarkdownContent
+            content={revision.content_md}
+            label={`修订 ${revision.revision} 原文与预览`}
+          />
           <TagBadges tags={revision.tags} />
           <AssetGallery assets={revision.assets} onExpired={onExpired} />
         </article>

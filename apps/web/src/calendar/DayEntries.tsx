@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { MarkdownContent } from '../components/MarkdownContent';
+
 import { getDay } from '../api/calendar';
 import { errorMessage, isUnauthorized } from '../api/client';
 import type { Entry } from '../api/journal';
@@ -80,7 +82,11 @@ export function DayEntries({ date, disabled, onExpired }: Props) {
         >
           <p className="small-note">版本 {entry.revision}</p>
           <PinnedBadge isPinned={entry.is_pinned} />
-          <pre className="markdown-text">{entry.content_md}</pre>
+          <MarkdownContent
+            content={entry.content_md}
+            label={`${date} 日记原文与预览`}
+            disabled={disabled}
+          />
           <TagBadges tags={entry.tags} />
           <AssetGallery assets={entry.assets} onExpired={onExpired} />
         </article>

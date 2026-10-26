@@ -61,6 +61,12 @@ M1 已实现 health、owner 会话和最小日记闭环；M2 已分片扩展月�
 
 网络结果不确定不显示成功、不自动重试；敏感表单跨导航保持锁定，先重新验证登录或用新密码重登核对，再允许提交。无公开找回、邮件、重置后门或设备会话列表；无新表/迁移/配置/依赖，head0006、导出v4不变。
 
+## 14：安全Markdown预览（无API变更）
+
+预览完全在前端派生，不读取/写入新接口、不创建修订或改写content_md；原文默认可见、独立切换，现有MarkdownEditor一直挂载。CommonMark/GFM只读渲染，原始HTML忽略、代码不执行；绝对http/https且无凭据/控制字符的链接才可点击，新页noopener/noreferrer/no-referrer。其他URL降纯文本，Markdown图片只显示alt占位，不读取src，私密图片继续AssetGallery鉴权懒加载。
+
+预览不进入请求体、数据库或导出，head0006/格式v4不变；冻结创建UUID、401/密码轮换和409草稿边界沿用。不是富文本编辑器或HTML清洗接口；真实IME矩阵仍以07人工证据为准。
+
 ## M2 第一片：月历与日详情
 
 - `GET /calendar?year=YYYY&month=M`：返回 `{year,month,days:[{date,entry_count}]}`。year 为 1–9999，month 为 1–12；days 按日期升序，仅包含有记录的日期，空月为 `[]`。

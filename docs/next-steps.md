@@ -1,6 +1,6 @@
 # 后续实施与接手计划
 
-当前功能范围为 [13：账户安全](../tasks/13-account-security.md)，沿用子代理和减少测试的偏好。实现当前密码验证、改密/退出其他会话、Session/CSRF接续与草稿保留；接手见 [账户交接](account-security-handoff.md)。[07输入法验收](../tasks/07-editor-compatibility.md)仍待人工证据；无新闻/AI开发。
+当前功能范围为 [14：安全Markdown预览](../tasks/14-markdown-preview.md)，沿用子代理和减少测试的偏好。原文默认保留、编辑器不替换，增加CommonMark/GFM只读预览及HTML/URL/媒体限制；见 [预览交接](markdown-preview-handoff.md)。[07输入法验收](../tasks/07-editor-compatibility.md)仍待人工证据，无新闻/AI开发。
 
 ## 先处理当前交付链
 
@@ -21,11 +21,12 @@
 | 10 归档标签筛选 | [PR #11](https://github.com/GZY-q/LifeArchive/pull/11)，`codex/archive-tag-filter`；[交接](archive-tag-filter-handoff.md)，该提交自动CI已通过 | PR #10 |
 | 11 私密图片 | [PR #12](https://github.com/GZY-q/LifeArchive/pull/12)，`codex/private-images`；[交接](private-images-handoff.md)，修正提交b2eef67的全CI及真实媒体恢复已通过 | PR #11 |
 | 12 日记置顶 | [PR #13](https://github.com/GZY-q/LifeArchive/pull/13)，`codex/journal-pinning`；[交接](journal-pinning-handoff.md)，该提交自动CI已通过 | PR #12修正提交b2eef67 |
-| 13 账户安全 | `codex/account-security`；[交接](account-security-handoff.md) | PR #13 |
+| 13 账户安全 | [PR #14](https://github.com/GZY-q/LifeArchive/pull/14)，`codex/account-security`；[交接](account-security-handoff.md)，该提交自动CI已通过 | PR #13 |
+| 14 安全Markdown预览 | `codex/markdown-preview`；[交接](markdown-preview-handoff.md) | PR #14 |
 
 先审阅 PR #2，再审阅 PR #3，再审阅搜索 PR #4、往年今日 PR #5、导出 PR #6、恢复演练 PR #7 和输入法验收 PR #8；每个依赖合入后重新核对后继 PR 的 base、差异和 CI，避免重复提交前一片内容。合并、重写已推送历史和清理旧数据不属于这份计划的自动动作。未经用户明确授权不自行合并。
 
-本轮沿用堆叠PR：13的base为`codex/journal-pinning`，起点`9a72e2cfde407664380424fad56196bc4ae4d470`。前序待依赖审阅，不把未合入内容当成main已有。保留用户`.DS_Store`、原图/日记、密码及会话，不在预览上替用户执行账户动作。
+本轮沿用堆叠PR：14的base为`codex/account-security`，起点`41276cf8ef46d4d6a6aa4f571ead1c72efe92623`。前序待依赖审阅，不把未合入内容当成main已有。保留用户`.DS_Store`、原文/图片、密码/会话及旧dist，不在预览上替owner执行账户动作。
 
 ## 建议顺序
 
@@ -41,6 +42,7 @@
 | [11 私密图片](../tasks/11-private-images.md) | 上传原图/鉴权读取、日记关联/历史、v3原图导出、媒体恢复脚本衔接 | 私有本地media卷、新增0005迁移和Pillow13 | 动画/SVG、媒体永久清除、缩略图转码、外部存储/AI |
 | [12 日记置顶](../tasks/12-journal-pinning.md) | 主列表置顶优先跨页、严格布尔/CAS/历史、导出v4 | 0006迁移和活跃排序索引，复用日记事务 | 拖拽/自定义顺序、伪造日期、改变其他时间视图排序 |
 | [13 账户安全](../tasks/13-account-security.md) | 当前密码验证、改密/撤销旧会话、当前新Session接续、草稿保留 | 复用User/Session/预算，无迁移 | 公开找回/注册、邮件、密码重置后门、设备列表 |
+| [14 安全Markdown预览](../tasks/14-markdown-preview.md) | 原文/预览切换、GFM、草稿同textarea、严格URL/HTML/图片策略 | 固定react-markdown10.1.0/remark-gfm4.0.1，无后端变化 | 原始HTML、远程图片、代码执行/高亮、替换编辑器 |
 
 05、06 将 M5 中最小的数据可携带、可恢复门槛提前，以便继续积累日记前有可验证的退路。05 的应用导出与 06 的数据库恢复是两个不同交付物：前者供独立读取，后者证明当前数据库可以恢复。计划没有完成或取消 M5；定时备份、加密异地副本、媒体一致性、保留策略和正式环境冷恢复仍属于 M5。
 
@@ -48,12 +50,12 @@
 
 ## 之后再切片的缺口
 
-- M1：08标签、09回收站、11静态图片、12置顶、13密码轮换已分片；仍含更多附件管理和安全Markdown预览。07真机矩阵未完，不能宣布全部M1验收完成。
+- M1：标签/回收站/静态图片/置顶/密码轮换/安全预览已分片；标签管理、更多附件管理仍可后续切片。07真机矩阵未完，不能宣布全部M1验收完成。
 - M2：10补齐单标签归档条件；月历、单日原文、搜索、往年今日已有独立交接。大规模数据索引与性能需另行测量，不把字面子串查询称为已完成中文全文检索。
 - M3/M4：保留 [原 roadmap](roadmap.md) 中新闻摄取、任务台账、来源校验、AI 摘要的先后关系。未另行分配之前不启动，不预建未来表或服务。
 - M5：11修正提交的Docker媒体恢复/负例已由CI验收，本机未追加完整演练。正式部署、自动加密异地备份、保留策略与生产冷恢复仍需后续，不能将合成演练称为生产备份上线。
 
-13后建议14做“安全Markdown预览”：复用测试过并固定版本的渲染库，只读预览、不改写Markdown，不替换现有IME编辑器；HTML默认禁用、危险URL和远程图片受限，私密图片仍走现有图库。先写有界工单，不夹带外部AI或编辑器重构。媒体管理/永久清除另切片，须先定义历史和备份保留；当前只规划。
+14后建议15做“标签改名”：先定义名称唯一性/并发契约，保留标签ID和已有历史名称快照，刷新目录/筛选摘要，不改Markdown或删除关联。标签/媒体永久清除另切片，须定义历史/备份保留。当前只规划，不提前开发新闻/AI。
 
 ## 每片的完成门槛
 

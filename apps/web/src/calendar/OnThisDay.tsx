@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { MarkdownContent } from '../components/MarkdownContent';
+
 import { getOnThisDay } from '../api/calendar';
 import { errorMessage, isUnauthorized } from '../api/client';
 import type { Entry } from '../api/journal';
@@ -126,7 +128,11 @@ function PastEntries({ date, disabled, onExpired }: Omit<Props, 'refresh'>) {
             {' · '}版本 {entry.revision}
           </p>
           <PinnedBadge isPinned={entry.is_pinned} />
-          <pre className="markdown-text">{entry.content_md}</pre>
+          <MarkdownContent
+            content={entry.content_md}
+            label={`${entry.entry_date} 往年日记原文与预览`}
+            disabled={disabled}
+          />
           <TagBadges tags={entry.tags} />
           <AssetGallery assets={entry.assets} onExpired={onExpired} />
         </article>

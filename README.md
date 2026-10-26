@@ -8,6 +8,7 @@ LifeArchive 是一个独立实现、单用户优先、自托管、面向几十�
 
 - 已完成 M0 基础设施；M1 提供单一 owner 登录、私密会话、日记 CRUD、原文修订历史、补记日期、分页与并发冲突保护。
 - 账户支持验证当前密码后改密或退出其他会话，当前浏览器换新会话继续；同页草稿保留。没有公开密码找回/重置入口，见 [13工单](tasks/13-account-security.md) 与 [交接](docs/account-security-handoff.md)。
+- 编辑区和各阅读视图提供安全Markdown预览，默认保留原文；支持常用语法/表格/任务列表，禁原始HTML与自动加载Markdown图片，私密图片继续使用图库。见 [14工单](tasks/14-markdown-preview.md) 与 [交接](docs/markdown-preview-handoff.md)。
 - M2 第一片提供月历计数和日期详情，按日记日期查看补记和同日多条记录；原文分页读取，切换视图保留当前草稿。
 - 归档搜索支持中文/英文连续原文、日记日期范围、单标签组合条件与分页，也可只按标签查找；手动提交，条件只放请求体。当前采用字面子串匹配，尚未验证大规模全文索引性能。见 [10 工单](tasks/10-archive-tag-filter.md) 与 [交接](docs/archive-tag-filter-handoff.md)。
 - M2 第三片提供“往年这一天”：在日历选择日期并展开，分页查看以前年份同月同日的原文；闰日严格匹配，切换日期或刷新重新读取。
@@ -209,6 +210,7 @@ tasks/            严格按顺序执行的里程碑工单
 - `tasks/11-private-images.md` — 私密原图、日记关联、历史与导出v3
 - `tasks/12-journal-pinning.md` — 置顶排序、修订、游标与导出v4
 - `tasks/13-account-security.md` — 改密、旧会话撤销与草稿保留
+- `tasks/14-markdown-preview.md` — 原文保留、安全只读预览与链接/媒体边界
 - `docs/next-steps.md` — 依赖顺序、验收状态与接手提示词
 - `docs/decisions.md` — 核心技术决策
 - `docs/m0-handoff.md` — M0 实现边界、代码入口和 M1 交接
@@ -225,6 +227,7 @@ tasks/            严格按顺序执行的里程碑工单
 - `docs/export-format.md` — 可移植格式v4、旧格式阅读及独立哈希核验
 - `docs/journal-pinning-handoff.md` — 置顶排序、兼容、迁移与运行交接
 - `docs/account-security-handoff.md` — 当前密码验证、会话轮换、并发边界与交接
+- `docs/markdown-preview-handoff.md` — 渲染依赖、预览安全策略、编辑器状态与交接
 - `docs/private-images-handoff.md` — 图片存储、权限、迁移、配置与交接
 - `docs/journal-tags-handoff.md` — 标签实现、必要检查结果与后续入口
 - `docs/journal-trash-handoff.md` — 回收站实现、运行方式与后续入口
