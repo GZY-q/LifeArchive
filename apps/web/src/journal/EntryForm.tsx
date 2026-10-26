@@ -50,6 +50,9 @@ export function EntryForm({
   const [uploading, setUploading] = useState(false);
   const [composing, setComposing] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(
+    draft.tag_ids.length > 0 || draft.attachments.length > 0,
+  );
   const [error, setError] = useState('');
   const [conflict, setConflict] = useState(false);
   const [latest, setLatest] = useState<Entry | null>(null);
@@ -142,7 +145,6 @@ export function EntryForm({
     <section className="composer paper-card" aria-labelledby="composer-title">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">KEEP A MOMENT</p>
           <h2 id="composer-title">{editing ? '编辑这篇日记' : '写下今天'}</h2>
         </div>
         {editing && (
@@ -187,6 +189,21 @@ export function EntryForm({
           <button
             type="button"
             className="text-button"
+            aria-expanded={toolsOpen}
+            aria-controls="journal-tools"
+            disabled={disabled || busy || uploading || composing}
+            onClick={() => setToolsOpen((open) => !open)}
+          >
+            标签与图片
+            {(draft.tag_ids.length > 0 || draft.attachments.length > 0) && (
+              <span className="tools-count" aria-hidden="true">
+                {draft.tag_ids.length + draft.attachments.length}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            className="text-button"
             disabled={disabled || busy || uploading || composing}
             aria-expanded={previewOpen}
             aria-controls="journal-draft-preview"
@@ -204,37 +221,39 @@ export function EntryForm({
             <MarkdownPreview content={draft.content_md} />
           </section>
         )}
-        <TagPicker
-          tags={tags}
-          selected={draft.tag_ids}
-          original={draft.original?.tags ?? []}
-          csrfToken={csrfToken}
-          disabled={locked}
-          loading={tagsLoading}
-          error={tagsError}
-          onChange={(tag_ids) => onDraft({ ...draft, tag_ids })}
-          onCreated={onTagCreated}
-          onRetry={onTagsRetry}
-          onExpired={onExpired}
-          onBusy={onBusy}
-        />
-        <AssetPicker
-          assets={draft.attachments}
-          csrfToken={csrfToken}
-          disabled={locked}
-          onChange={(attachments) =>
-            onDraft({
-              ...draft,
-              attachments,
-              asset_ids: attachments.map((asset) => asset.id),
-            })
-          }
-          onExpired={onExpired}
-          onBusy={(value) => {
-            setUploading(value);
-            onBusy(value);
-          }}
-        />
+        <div id="journal-tools" className="composer-tools" hidden={!toolsOpen}>
+          <TagPicker
+            tags={tags}
+            selected={draft.tag_ids}
+            original={draft.original?.tags ?? []}
+            csrfToken={csrfToken}
+            disabled={locked}
+            loading={tagsLoading}
+            error={tagsError}
+            onChange={(tag_ids) => onDraft({ ...draft, tag_ids })}
+            onCreated={onTagCreated}
+            onRetry={onTagsRetry}
+            onExpired={onExpired}
+            onBusy={onBusy}
+          />
+          <AssetPicker
+            assets={draft.attachments}
+            csrfToken={csrfToken}
+            disabled={locked}
+            onChange={(attachments) =>
+              onDraft({
+                ...draft,
+                attachments,
+                asset_ids: attachments.map((asset) => asset.id),
+              })
+            }
+            onExpired={onExpired}
+            onBusy={(value) => {
+              setUploading(value);
+              onBusy(value);
+            }}
+          />
+        </div>
         {error && (
           <p className="error-message" role="alert">
             {error}

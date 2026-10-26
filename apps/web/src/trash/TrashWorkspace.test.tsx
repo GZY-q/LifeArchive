@@ -56,6 +56,9 @@ describe('journal trash', () => {
       return undefined;
     });
     render(<App />);
+    await userEvent.click(
+      await screen.findByRole('button', { name: '标签与图片' }),
+    );
     fireEvent.change(await screen.findByLabelText('日记内容'), {
       target: { value: '未确认的原文草稿' },
     });

@@ -71,6 +71,9 @@ describe('account security', () => {
       return undefined;
     });
     render(<App />);
+    await userEvent.click(
+      await screen.findByRole('button', { name: '标签与图片' }),
+    );
     fireEvent.change(await screen.findByLabelText('日记内容'), {
       target: { value: '修改密码期间保留的草稿' },
     });

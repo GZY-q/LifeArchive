@@ -62,7 +62,6 @@ export function CalendarWorkspace({
       <section className="calendar-panel paper-card" aria-label="月历">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">ONE DAY AT A TIME</p>
             <h2>
               {year} 年 {month} 月
             </h2>

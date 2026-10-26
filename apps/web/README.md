@@ -1,5 +1,9 @@
 # LifeArchive Web · 日记、标签与回收站
 
+界面采用 Apple 应用风格：浅灰底、白色阅读区、系统字体和统一蓝色操作。桌面使用侧栏导航，手机使用可横向滚动的单行导航；日记的“标签与图片”默认收起，有已选标签或图片的编辑/恢复草稿会自动展开。展开、收起或切换页面保留原编辑器与工具输入。设计说明、运行命令和验收边界见 [界面改版交接](../../docs/apple-ui-redesign.md)。
+
+隔离布局回归：在此目录执行 `npm run build`，再从仓库根目录执行 `node scripts/check-ui-layout.mjs`。需要 Chrome（可设置 `CHROME_BIN`），使用随机本机端口、临时浏览器配置和合成 API 数据，不连接现有后端或数据库。
+
 安全Markdown预览复用`components/MarkdownPreview.tsx`/`MarkdownContent.tsx`：原文默认、支持CommonMark/GFM，忽略HTML、只允许绝对无凭据HTTP(S)链接、不创建Markdown img。草稿预览保持现textarea节点；图库继续鉴权读取。新增react-markdown10.1.0/remark-gfm4.0.1均精确锁定，未升级原包；见 [预览交接](../../docs/markdown-preview-handoff.md)。
 
 账号栏“账户”支持改密/退出其他会话，均验证当前密码；新Session接续同页草稿和后续CSRF。密码输入仅组件内存，提交结束/离开清空，网络不确定时跨导航禁重发，先重新验证或重登核对。不会自动操作账户；见 [账户交接](../../docs/account-security-handoff.md)。

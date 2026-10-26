@@ -1,3 +1,4 @@
+/* finesse · register=product · design-language=apple · apple-mode=app */
 .markdown-content,
 .markdown-preview {
   min-width: 0;
@@ -47,16 +48,16 @@
 
 .markdown-preview blockquote {
   margin: 1em 0;
-  border-left: 3px solid #a6b79e;
+  border-left: 1px solid var(--control-line);
   padding-left: 16px;
-  color: #5b6557;
+  color: var(--muted);
 }
 
 .markdown-preview pre {
   max-width: 100%;
   overflow-x: auto;
   border-radius: 8px;
-  background: #f0f2e9;
+  background: var(--surface-soft);
   padding: 14px;
   white-space: pre;
 }
@@ -68,7 +69,7 @@
 
 .markdown-preview :not(pre) > code {
   border-radius: 3px;
-  background: #f0f2e9;
+  background: var(--surface-soft);
   padding: 2px 4px;
 }
 
@@ -81,16 +82,16 @@
 
 .markdown-preview th,
 .markdown-preview td {
-  border: 1px solid #dce1d4;
+  border: 1px solid var(--line);
   padding: 6px 10px;
   text-align: left;
 }
 
 .markdown-preview th {
-  background: #f0f2e9;
+  background: var(--surface-soft);
 }
 .markdown-preview a {
-  color: #3e5a35;
+  color: var(--accent);
   text-decoration: underline;
 }
 .markdown-preview .contains-task-list {
@@ -101,6 +102,6 @@
   margin-right: 8px;
 }
 .markdown-image-placeholder {
-  color: #687161;
+  color: var(--muted);
   font-size: 0.9em;
 }

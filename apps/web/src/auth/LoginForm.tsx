@@ -36,12 +36,7 @@ export function LoginForm({
 
   return (
     <section className="login-panel" aria-labelledby="login-title">
-      <p className="eyebrow">A PLACE FOR YOUR DAYS</p>
-      <h1 id="login-title">
-        欢迎回到
-        <br />
-        你的生活档案。
-      </h1>
+      <h1 id="login-title">欢迎回来。</h1>
       <p className="muted">登录后，继续记录属于你的日子。</p>
       <form className="login-form" onSubmit={(event) => void submit(event)}>
         <label htmlFor="username">用户名</label>
