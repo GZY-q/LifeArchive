@@ -16,6 +16,7 @@ export const sampleEntry: Entry = {
   created_at: '2026-10-02T03:00:00Z',
   updated_at: '2026-10-02T03:00:00Z',
   tags: [],
+  assets: [],
 };
 
 export function json(value: unknown, status = 200): Response {

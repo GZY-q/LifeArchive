@@ -15,17 +15,31 @@ from sqlalchemy import select
 from life_archive.auth.models import AuthSession, LoginThrottle, User
 from life_archive.db import get_engine
 from life_archive.journal.models import Entry, EntryRevision, EntryTag, Tag
+from life_archive.media.models import Asset, EntryAsset
+from life_archive.media.storage import read_original
 
 
 def fingerprint() -> str:
     digest = hashlib.sha256()
     with get_engine().connect() as connection:
-        for model in (User, AuthSession, LoginThrottle, Entry, EntryRevision, Tag, EntryTag):
+        for model in (
+            User,
+            AuthSession,
+            LoginThrottle,
+            Entry,
+            EntryRevision,
+            Tag,
+            EntryTag,
+            Asset,
+            EntryAsset,
+        ):
             digest.update(model.__tablename__.encode())
             query = select(model.__table__).order_by(*model.__table__.primary_key.columns)
             with connection.execute(query.execution_options(yield_per=100)) as rows:
                 for row in rows.mappings():
                     digest.update(json.dumps(dict(row), default=str, sort_keys=True).encode())
+                    if model is Asset:
+                        digest.update(hashlib.sha256(read_original(row)).digest())
     return digest.hexdigest()
 
 
@@ -60,7 +74,7 @@ def main() -> None:
         assert output.stat().st_mode & 0o777 == 0o600
         with ZipFile(output) as archive:
             manifest = json.loads(archive.read("manifest.json"))
-            assert manifest["schema_version"] == 2
+            assert manifest["schema_version"] == 3
             assert manifest["deleted_policy"] == (
                 "include_deleted" if include_deleted else "active_only"
             )
@@ -72,6 +86,12 @@ def main() -> None:
             assert set(names) == {"manifest.json"} | {item["path"] for item in manifest["files"]}
             catalog = json.loads(archive.read("tags.json"))
             assert all(set(tag) == {"id", "name", "created_at"} for tag in catalog)
+            assets = json.loads(archive.read("assets.json"))
+            assert len(assets) == manifest["asset_count"]
+            for asset in assets:
+                original = archive.read(asset["file_path"])
+                assert len(original) == asset["byte_size"]
+                assert hashlib.sha256(original).hexdigest() == asset["sha256"]
             for item in manifest["files"]:
                 data = archive.read(item["path"])
                 assert len(data) == item["bytes"]

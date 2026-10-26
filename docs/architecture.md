@@ -48,6 +48,7 @@ Keep source article metadata and publication times, respect robots/content licen
 - Build frontend static files, serve with Caddy; FastAPI behind HTTPS proxy.
 - API and worker run same Python app image using separate startup commands.
 - Save durable database and media volumes, external encrypted backups.
+- Task11 stores immutable raster originals in the private local media volume (API read/write, worker read-only, no web mount). Authenticated owner routes validate content and serve original bytes; journal revisions retain asset snapshots. Files are durable before metadata commit; orphan files may be retained after failure. Database plus media must be backed up together, with no automatic media purge.
 - Future: object storage adapter, pgvector, multiuser, separate worker host. Avoid implementing these until use cases justify them.
 
 ## Maintainability

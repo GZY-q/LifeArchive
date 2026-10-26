@@ -60,7 +60,7 @@ def prepare(directory: Path, source_port: int, target_port: int) -> tuple[Stack,
             for name in ("api", "worker", "web", "postgres")
         },
         "networks": {name: {"labels": labels} for name in ("frontend", "database")},
-        "volumes": {"pgdata": {"labels": labels}},
+        "volumes": {name: {"labels": labels} for name in ("pgdata", "media")},
     }
     private_write(directory / "compose.images.json", json.dumps(override).encode())
     return stacks[0], stacks[1], run_id
@@ -130,6 +130,53 @@ def restore(docker: Docker, source: Stack, target: Stack, dump: Path) -> None:
         )
 
 
+def restore_media(docker: Docker, source: Stack, target: Stack, directory: Path) -> None:
+    require(validate_pair(source, target) == docker.run_id, "Unexpected media restore identity")
+    docker.owned_media(source)
+    payload = helper(docker, source, "media_export")
+    encoded = json.dumps(payload).encode()
+    require(len(encoded) <= 4096, "Unexpected synthetic media payload size")
+    private_write(directory / "synthetic-media.json", encoded)
+    # Create a stopped API container so Compose initializes the media volume
+    # with the runtime UID; verify ownership before the helper writes any bytes.
+    # `create` has no --no-deps option. Keep the restored PG container intact
+    # while creating the stopped API container and its private media volume.
+    docker.command(target, "create", "--no-build", "--no-recreate", "--pull", "never", "api")
+    require(docker.owned_media(target) != docker.owned_media(source), "Media volumes overlap")
+    container_id = docker.command(target, "ps", "--all", "--quiet", "api").decode().strip()
+    container = docker.inspect("container", container_id)
+    docker.check_labels(container["Config"]["Labels"], target)
+    require(not container["State"]["Running"], "Target API started before media restore")
+    mounts = container["Mounts"]
+    require(
+        len(mounts) == 1
+        and mounts[0]["Type"] == "volume"
+        and mounts[0]["Name"] == target.project + "_media"
+        and mounts[0]["Destination"] == "/var/lib/lifearchive/media",
+        "Unexpected target private media mount",
+    )
+    # This command starts no API/server. The runtime UID writes exclusive files
+    # in the fresh project's own volume only after the helper checks emptiness.
+    code = (REPO / "scripts/restore_fixture.py").read_text()
+    result = json.loads(
+        docker.command(
+            target,
+            "run",
+            "--no-deps",
+            "--name",
+            target.project + "-media-restore",
+            "-T",
+            "api",
+            "python",
+            "-c",
+            code,
+            "media_restore",
+            data=encoded,
+        )
+    )
+    require(result == {"files": 2}, "Synthetic media restore did not finish")
+
+
 def rehearse(
     docker: Docker, source: Stack, target: Stack, directory: Path, report: dict, corrupt: bool
 ) -> None:
@@ -149,7 +196,15 @@ def rehearse(
     require(baseline["heads"] == [baseline["expected_head"]], "Source migration mismatch")
     require(
         baseline["counts"]
-        == {"entries": 3, "entry_revisions": 6, "deleted": 1, "tags": 4, "entry_tags": 3},
+        == {
+            "entries": 3,
+            "entry_revisions": 6,
+            "deleted": 1,
+            "tags": 4,
+            "entry_tags": 3,
+            "assets": 2,
+            "entry_assets": 2,
+        },
         "Fixture counts mismatch",
     )
     report.update({"migration": baseline["expected_head"], "counts": baseline["counts"]})
@@ -209,6 +264,9 @@ def rehearse(
             )
         raise
     report["checks"]["empty_target_and_restore"] = True
+    docker.phase = "restore private media"
+    restore_media(docker, source, target, directory)
+    report["checks"]["private_media_restored"] = True
     docker.phase = "start restored application"
     docker.command(
         target, "up", "--detach", "--wait", "--wait-timeout", "180", "--no-build", "--pull", "never"
@@ -284,6 +342,8 @@ def main(argv: list[str] | None = None) -> int:
         "target_project": target.project,
         "source_volume": source.project + "_pgdata",
         "target_volume": target.project + "_pgdata",
+        "source_media_volume": source.project + "_media",
+        "target_media_volume": target.project + "_media",
         "source_port": source.port,
         "target_port": target.port,
         "negative_fixture": args.corrupt_test_dump,

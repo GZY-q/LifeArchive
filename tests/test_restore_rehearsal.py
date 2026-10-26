@@ -46,7 +46,10 @@ class RestoreGuardTests(unittest.TestCase):
         labels = {support.LABEL: RUN_ID}
         return {
             "name": self.source.project,
-            "volumes": {"pgdata": {"name": self.source.project + "_pgdata", "labels": labels}},
+            "volumes": {
+                name: {"name": self.source.project + "_" + name, "labels": labels}
+                for name in ("pgdata", "media")
+            },
             "networks": {
                 "frontend": {"labels": labels},
                 "database": {"labels": labels, "internal": True},
@@ -81,6 +84,18 @@ class RestoreGuardTests(unittest.TestCase):
                 "target": "/var/lib/postgresql/data",
             }
         ]
+        for name, read_only in (("api", False), ("worker", True)):
+            config["services"][name]["volumes"] = [
+                {
+                    "type": "volume",
+                    "source": "media",
+                    "target": "/var/lib/lifearchive/media",
+                    "read_only": read_only,
+                }
+            ]
+            config["services"][name]["environment"] = {
+                "LIFEARCHIVE_MEDIA_ROOT": "/var/lib/lifearchive/media"
+            }
         return config
 
     def test_new_artifact_directory_and_environment_files_are_private(self):
@@ -196,6 +211,9 @@ class RestoreGuardTests(unittest.TestCase):
         mutations = (
             lambda c: c["volumes"]["pgdata"].update(external=True),
             lambda c: c["volumes"]["pgdata"].update(name="production_pgdata"),
+            lambda c: c["volumes"]["media"].update(external=True),
+            lambda c: c["volumes"]["media"].update(name="production_media"),
+            lambda c: c["services"]["worker"]["volumes"][0].update(read_only=False),
             lambda c: c["networks"]["database"].update(internal=False),
             lambda c: c["services"]["postgres"].update(ports=[{"published": "5432"}]),
             lambda c: c["services"]["web"]["ports"][0].update(host_ip="0.0.0.0"),
@@ -346,14 +364,20 @@ class PortableComparisonTests(unittest.TestCase):
         path = self.root / name
         member = "entries/00000000-0000-0000-0000-000000000001.md"
         manifest = {
-            "schema_version": 2,
-            "alembic_revision": "0004_entry_tags",
+            "schema_version": 3,
+            "alembic_revision": "0005_private_images",
             "owner": {"id": "owner"},
             "deleted_policy": "include_deleted",
             "entry_count": 1,
             "revision_count": 0,
+            "asset_count": 0,
             "exported_at": exported_at,
             "files": [
+                {
+                    "path": "assets.json",
+                    "bytes": 3,
+                    "sha256": hashlib.sha256(b"[]\n").hexdigest(),
+                },
                 {
                     "path": member,
                     "bytes": len(content),
@@ -369,6 +393,7 @@ class PortableComparisonTests(unittest.TestCase):
         with ZipFile(path, "w") as archive:
             archive.writestr(member, content)
             archive.writestr("tags.json", b"[]\n")
+            archive.writestr("assets.json", b"[]\n")
             archive.writestr("manifest.json", json.dumps(manifest))
         return path
 
@@ -376,23 +401,24 @@ class PortableComparisonTests(unittest.TestCase):
         a = self.archive("a.zip")
         b = self.archive("b.zip", exported_at="2026-10-25T00:01:00+00:00")
         self.assertEqual(
-            checks.compare_exports(a, b, "0004_entry_tags"),
+            checks.compare_exports(a, b, "0005_private_images"),
             {
                 "entries": 1,
                 "revisions": 0,
-                "files": 2,
+                "assets": 0,
+                "files": 3,
             },
         )
         changed = self.archive("changed.zip", content=b"changed")
         with self.assertRaises(support.RestoreError):
-            checks.compare_exports(a, changed, "0004_entry_tags")
+            checks.compare_exports(a, changed, "0005_private_images")
         with self.assertRaises(support.RestoreError):
             checks.compare_exports(a, b, "other_head")
 
     def test_corrupt_export_hash_is_rejected(self):
         a, b = self.archive("a.zip"), self.archive("bad.zip", bad_hash=True)
         with self.assertRaises(support.RestoreError):
-            checks.compare_exports(a, b, "0004_entry_tags")
+            checks.compare_exports(a, b, "0005_private_images")
 
 
 if __name__ == "__main__":

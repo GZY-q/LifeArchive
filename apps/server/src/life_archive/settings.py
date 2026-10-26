@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 from ipaddress import ip_address
+from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
@@ -64,6 +65,20 @@ class AuthSettings(EnvironmentSettings):
         return self
 
 
+class MediaSettings(EnvironmentSettings):
+    model_config = SettingsConfigDict(env_prefix="LIFEARCHIVE_")
+
+    media_root: Path = Path("/var/lib/lifearchive/media")
+    media_quota_bytes: int = Field(default=1024 * 1024 * 1024, ge=1)
+
+    @field_validator("media_root")
+    @classmethod
+    def require_absolute_root(cls, value: Path) -> Path:
+        if not value.is_absolute():
+            raise ValueError("Private media root must be absolute")
+        return value
+
+
 class DatabaseSettings(EnvironmentSettings):
     postgres_host: str = "postgres"
     postgres_port: int = Field(default=5432, ge=1, le=65535)
@@ -118,3 +133,8 @@ def get_database_settings() -> DatabaseSettings:
 @lru_cache
 def get_auth_settings() -> AuthSettings:
     return AuthSettings()
+
+
+@lru_cache
+def get_media_settings() -> MediaSettings:
+    return MediaSettings()

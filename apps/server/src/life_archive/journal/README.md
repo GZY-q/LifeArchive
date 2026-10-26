@@ -46,8 +46,13 @@ already started a read transaction. Originals and snapshots commit together.
   return 409. Restore preserves creation UUID, ID and all history; no new entry is created.
 
 Migration `0004_entry_tags` follows `0003_journal`. It adds `tags`, `entry_tags`
-and revision JSONB label snapshots (existing revisions receive `[]`). It does
-not implement media, news or AI. Task 09 adds restoration without a new migration.
+and revision JSONB label snapshots (existing revisions receive `[]`).
+Task11 adds `0005_private_images`: private assets/entry_assets, owner foreign keys,
+and revision `assets` snapshots. Entry create/PATCH accepts up to ten owner asset IDs,
+sharing the same CAS and transaction as text/date/tags. Creation replay compares revision1
+asset-ID sets. Detach/delete/restore retains originals and historical references.
+Upload and authenticated original reads live in `media/`; portable export v3 includes
+selected current/historical originals. This module does not implement news or AI.
 Tests under `tests/journal` use the shared real-PostgreSQL fixtures, including
 simultaneous creation and edits. Run with the test database configuration from
 the server README. For the focused tag checks:

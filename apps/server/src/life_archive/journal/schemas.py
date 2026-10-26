@@ -16,9 +16,12 @@ from pydantic import (
     model_validator,
 )
 
+from life_archive.media.schemas import AssetResponse
+
 Markdown = Annotated[str, Field(min_length=1, max_length=100_000)]
 RevisionNumber = Annotated[int, Field(strict=True, gt=0)]
 TagIds = Annotated[list[UUID], Field(max_length=20)]
+AssetIds = Annotated[list[UUID], Field(max_length=10)]
 
 
 def normalize_tag_name(value: str) -> tuple[str, str]:
@@ -34,6 +37,12 @@ def normalize_tag_name(value: str) -> tuple[str, str]:
 def unique_tag_ids(value: list[UUID] | None) -> list[UUID] | None:
     if value is not None and len(set(value)) != len(value):
         raise ValueError("Duplicate tag IDs are not allowed")
+    return value
+
+
+def unique_asset_ids(value: list[UUID] | None) -> list[UUID] | None:
+    if value is not None and len(set(value)) != len(value):
+        raise ValueError("Duplicate asset IDs are not allowed")
     return value
 
 
@@ -82,8 +91,10 @@ class EntryCreate(BaseModel):
     entry_date: ArchiveDate
     client_request_id: UUID | None = None
     tag_ids: TagIds = Field(default_factory=list)
+    asset_ids: AssetIds = Field(default_factory=list)
 
     _unique_tags = field_validator("tag_ids")(unique_tag_ids)
+    _unique_assets = field_validator("asset_ids")(unique_asset_ids)
 
     @field_validator("content_md")
     @classmethod
@@ -102,14 +113,16 @@ class EntryUpdate(BaseModel):
     content_md: Markdown | None = None
     entry_date: ArchiveDate | None = None
     tag_ids: TagIds | None = None
+    asset_ids: AssetIds | None = None
 
     _unique_tags = field_validator("tag_ids")(unique_tag_ids)
+    _unique_assets = field_validator("asset_ids")(unique_asset_ids)
 
     @model_validator(mode="after")
     def require_changes(self) -> Self:
         changed = self.model_fields_set - {"expected_revision"}
         if not changed:
-            raise ValueError("Provide content_md, entry_date or tag_ids to edit")
+            raise ValueError("Provide content_md, entry_date, tag_ids or asset_ids to edit")
         if any(getattr(self, name) is None for name in changed):
             raise ValueError("Journal fields cannot be null")
         if self.content_md is not None and not self.content_md.strip():
@@ -131,6 +144,7 @@ class EntryResponse(BaseModel):
     created_at: AwareDatetime
     updated_at: AwareDatetime
     tags: list[TagLabel]
+    assets: list[AssetResponse]
 
 
 class EntryRestore(BaseModel):
@@ -157,6 +171,7 @@ class RevisionResponse(BaseModel):
     changed_at: AwareDatetime
     editor_id: UUID
     tags: list[TagLabel]
+    assets: list[AssetResponse]
 
 
 class EntryPage(BaseModel):

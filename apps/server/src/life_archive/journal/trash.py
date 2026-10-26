@@ -92,7 +92,7 @@ def restore_entry(session: Session, user_id: UUID, entry_id: UUID, expected_revi
                 "The journal entry changed or was restored; reload before retrying",
             )
         # Never trust a relationship cached before another request's completed edit.
-        session.expire(entry, ["tags"])
+        session.expire(entry, ["tags", "assets"])
         _snapshot(session, entry, user_id)
         session.commit()
     except Exception:

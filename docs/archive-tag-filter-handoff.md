@@ -35,6 +35,8 @@ docker compose exec -T api alembic current
 
 仅重启自己的开发API加载本片代码，不迁移或写入预览数据。18088健康接口正常。CI由PR自动触发，未用前一片结果替代本片验收。
 
+后续只读查询确认：提交 `5bc0e98179191476fa70f9888c9fb8903a9f6a6f` 的 [自动CI 40249901153](https://github.com/GZY-q/LifeArchive/actions/runs/40249901153) 已成功；本机未追加全量运行。此结果只属于10，不代表图片功能。
+
 最小复核命令（PG配置安全注入 `TEST_POSTGRES_*`，skip不等于通过）：
 
 ```bash

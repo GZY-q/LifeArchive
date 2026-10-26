@@ -8,6 +8,7 @@ from sqlalchemy import create_engine, pool
 from life_archive.auth import models as auth_models  # noqa: F401 -- register model metadata
 from life_archive.db import Base
 from life_archive.journal import models as journal_models  # noqa: F401 -- register model metadata
+from life_archive.media import models as media_models  # noqa: F401 -- register model metadata
 from life_archive.settings import get_database_settings
 
 config = context.config

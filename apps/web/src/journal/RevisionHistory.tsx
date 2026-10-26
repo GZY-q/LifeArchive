@@ -4,6 +4,7 @@ import { errorMessage, isUnauthorized } from '../api/client';
 import { listRevisions } from '../api/journal';
 import type { EntryRevision } from '../api/journal';
 import { TagBadges } from './TagBadges';
+import { AssetGallery } from './AssetGallery';
 
 export function RevisionHistory({
   entryId,
@@ -69,6 +70,7 @@ export function RevisionHistory({
           </p>
           <pre className="markdown-text">{revision.content_md}</pre>
           <TagBadges tags={revision.tags} />
+          <AssetGallery assets={revision.assets} onExpired={onExpired} />
         </article>
       ))}
       {busy && <p role="status">正在读取历史…</p>}

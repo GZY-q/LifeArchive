@@ -4,6 +4,7 @@ import { ApiError, errorMessage, isUnauthorized } from '../api/client';
 import { listTrash, restoreEntry } from '../api/trash';
 import type { TrashEntry } from '../api/trash';
 import { TagBadges } from '../journal/TagBadges';
+import { AssetGallery } from '../journal/AssetGallery';
 
 type Props = {
   csrfToken: string;
@@ -186,6 +187,7 @@ export function TrashWorkspace({
           </p>
           <pre className="markdown-text">{entry.content_md}</pre>
           <TagBadges tags={entry.tags} />
+          <AssetGallery assets={entry.assets} onExpired={onExpired} />
           <div className="entry-actions">
             <button
               type="button"

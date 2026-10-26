@@ -18,26 +18,30 @@ from life_archive.db import get_db_session
 from life_archive.settings import (
     EnvironmentSettings,
     get_database_settings,
+    get_media_settings,
     get_settings,
 )
 
 
 @pytest.fixture(autouse=True)
-def isolated_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+def isolated_settings(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[None]:
     """Unit tests never read a developer's .env file or database credentials."""
     for name in tuple(os.environ):
         if name.startswith(("POSTGRES_", "LIFEARCHIVE_")):
             monkeypatch.delenv(name, raising=False)
     for settings_class in EnvironmentSettings.__subclasses__():
         monkeypatch.setitem(settings_class.model_config, "env_file", None)
+    monkeypatch.setenv("LIFEARCHIVE_MEDIA_ROOT", str(tmp_path / "private-media"))
     get_settings.cache_clear()
     get_database_settings.cache_clear()
+    get_media_settings.cache_clear()
     auth_settings = getattr(settings_module, "get_auth_settings", None)
     if auth_settings is not None:
         auth_settings.cache_clear()
     yield
     get_settings.cache_clear()
     get_database_settings.cache_clear()
+    get_media_settings.cache_clear()
     if auth_settings is not None:
         auth_settings.cache_clear()
 

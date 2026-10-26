@@ -52,6 +52,22 @@ class Client:
         self.csrf = session["csrf_token"]
         return session["user"]
 
+    def original(self, asset_id: str) -> dict:
+        with self.http.open(self.origin + "/api/v1/assets/" + asset_id, timeout=15) as response:
+            require(response.status == 200, "Restored original media unavailable")
+            require(
+                response.headers.get("Cache-Control") == "no-store"
+                and response.headers.get("X-Content-Type-Options") == "nosniff",
+                "Restored original media privacy headers missing",
+            )
+            data = response.read(1025)
+            require(len(data) <= 1024, "Unexpected synthetic media size")
+            return {
+                "bytes": len(data),
+                "sha256": hashlib.sha256(data).hexdigest(),
+                "mime_type": response.headers.get_content_type(),
+            }
+
     def views(self, ids: dict[str, str]) -> dict:
         result = {"entries": self.request("/entries?limit=100")}
         require(
@@ -77,6 +93,27 @@ class Client:
             == [[ids["tag_current"]], [], [ids["tag_original"]]],
             "Restored current or historical tags mismatch",
         )
+        require(
+            [asset["id"] for asset in result["entry"]["assets"]] == [ids["asset_current"]]
+            and [[asset["id"] for asset in row["assets"]] for row in result["history"]["items"]]
+            == [[ids["asset_current"]], [], [ids["asset_original"]]],
+            "Restored current or historical images mismatch",
+        )
+        result["media"] = {
+            ids[key]: self.original(ids[key]) for key in ("asset_original", "asset_current")
+        }
+        for snapshot in (result["entry"], *result["history"]["items"]):
+            for asset in snapshot["assets"]:
+                original = result["media"][asset["id"]]
+                require(
+                    original
+                    == {
+                        "bytes": asset["byte_size"],
+                        "sha256": asset["sha256"],
+                        "mime_type": asset["mime_type"],
+                    },
+                    "Restored image metadata and original differ",
+                )
         result["tag_filter"] = self.request("/entries?tag_id=" + ids["tag_original"])
         require(
             [row["id"] for row in result["tag_filter"]["items"]] == [ids["second"]],
@@ -126,7 +163,7 @@ def file_sha256(path: Path) -> str:
 def verified_manifest(archive: ZipFile) -> dict:
     manifest = json.loads(archive.read("manifest.json"))
     require(
-        manifest["schema_version"] == 2 and manifest["deleted_policy"] == "include_deleted",
+        manifest["schema_version"] == 3 and manifest["deleted_policy"] == "include_deleted",
         "Unexpected portable export format or deleted policy",
     )
     names = archive.namelist()
@@ -135,6 +172,7 @@ def verified_manifest(archive: ZipFile) -> dict:
         len(names) == len(set(names))
         and paths == sorted(set(paths))
         and "tags.json" in paths
+        and "assets.json" in paths
         and set(names) == set(paths) | {"manifest.json"},
         "Export member set mismatch",
     )
@@ -146,6 +184,19 @@ def verified_manifest(archive: ZipFile) -> dict:
                 size += len(chunk)
         require(
             size == item["bytes"] and digest.hexdigest() == item["sha256"], "Export hash mismatch"
+        )
+    assets = json.loads(archive.read("assets.json"))
+    require(
+        isinstance(assets, list) and len(assets) == manifest["asset_count"],
+        "Export original-media count mismatch",
+    )
+    for asset in assets:
+        require(asset["file_path"] in paths, "Export original media missing")
+        original = archive.read(asset["file_path"])
+        require(
+            len(original) == asset["byte_size"]
+            and hashlib.sha256(original).hexdigest() == asset["sha256"],
+            "Export original-media integrity mismatch",
         )
     return manifest
 
@@ -160,6 +211,7 @@ def compare_exports(source: Path, target: Path, expected_head: str) -> dict:
             "deleted_policy",
             "entry_count",
             "revision_count",
+            "asset_count",
             "files",
         ):
             require(a[field] == b[field], "Source/target portable metadata mismatch")
@@ -174,5 +226,6 @@ def compare_exports(source: Path, target: Path, expected_head: str) -> dict:
         return {
             "entries": a["entry_count"],
             "revisions": a["revision_count"],
+            "assets": a["asset_count"],
             "files": len(a["files"]),
         }
